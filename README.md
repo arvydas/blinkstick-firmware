@@ -1,4 +1,4 @@
 blinkstick-firmware
 ===================
 
-ATTiny45/85 firmware for BlinkStick device
+This readme will be updated when the source code is released.
