@@ -7,6 +7,8 @@
 # License: GNU GPL v2 (see License.txt), GNU GPL v3 or proprietary (CommercialLicense.txt)
 # This Revision: $Id: Makefile 692 2008-11-07 15:07:40Z cs $
 
+SHELL=C:/Windows/System32/cmd.exe
+
 #DEVICE  = attiny45
 DEVICE  = attiny85
 F_CPU   = 16500000
