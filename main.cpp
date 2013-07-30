@@ -27,6 +27,10 @@ extern "C"
 }
 #include "oddebug.h"        /* This is also an example for using debug macros */
 #include "requests.h"       /* The custom request numbers we use */
+extern "C"
+{
+	#include "light_ws2812.h"
+}
 
 /* ------------------------------------------------------------------------- */
 /* ----------------------------- USB interface ----------------------------- */
@@ -333,9 +337,46 @@ void pwmInit (void)
     OCR1B = 255;   // PB4
 } 
 
+//struct CRGB { uint8_t g; uint8_t r; uint8_t b; };
+//struct CRGB led[1];
 
 int main(void)
 {
+	uint8_t mask;
+	
+	CLKPR=_BV(CLKPCE);
+	CLKPR=0;			// set clock prescaler to 1 (attiny 25/45/85/24/44/84/13/13A)		
+	mask=_BV(PB4);
+	DDRB|=mask;
+	
+	while(1)
+    {
+		uint8_t led[3];
+
+		led[0]=32;led[1]=32;led[2]=32;
+		ws2812_sendarray_mask(&led[0], 3, _BV(PB4));
+		_delay_ms(500);
+		
+		led[0]=32;led[1]=0;led[2]=0;
+		ws2812_sendarray_mask(&led[0], 3, _BV(PB4));
+		_delay_ms(500);
+
+		/*
+		uint8_t i;
+		
+		led[0].r=32;led[0].g=32;led[0].b=32;
+
+		ws2812_sendarray(&led[0],3);
+		_delay_ms(500);
+		
+		led[0].r=32;led[0].g=0;led[0].b=0;
+	
+		ws2812_sendarray(&led[0],3);
+		_delay_ms(500);
+		*/
+	
+    } 
+
 	uchar   i;
 
     wdt_enable(WDTO_1S);
@@ -356,6 +397,9 @@ int main(void)
         _delay_ms(1);
     }
     usbDeviceConnect();
+	
+
+
 
     LED_PORT_DDR |= _BV(R_BIT);   /* make the LED bit an output */
     LED_PORT_DDR |= _BV(G_BIT);   /* make the LED bit an output */
