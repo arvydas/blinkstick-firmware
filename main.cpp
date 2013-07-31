@@ -119,9 +119,27 @@ uchar usbFunctionWrite(uchar *data, uchar len)
 	if (reportId == 1)
 	{
 		//Set color
-		OCR1B = 255 - data[1];
-		OCR0B = 255 - data[2];
-		OCR0A = 255 - data[3];
+		//OCR1B = 255 - data[1];
+		//OCR0B = 255 - data[2];
+		//OCR0A = 255 - data[3];
+
+		uint8_t led[3];
+
+		led[0]=data[2];
+		led[1]=data[1];
+		led[2]=data[3];
+
+		cli();
+		ws2812_sendarray_mask(&led[0], 3, _BV(PB4));
+		sei();
+
+		/*
+		led[0]=0;   //g
+		led[1]=255; //r
+		led[2]=0;   //b
+
+		ws2812_sendarray_mask(&led[0], 3, _BV(PB4));
+		*/
 
 		return 1;
 	}
@@ -337,45 +355,33 @@ void pwmInit (void)
     OCR1B = 255;   // PB4
 } 
 
-//struct CRGB { uint8_t g; uint8_t r; uint8_t b; };
-//struct CRGB led[1];
-
 int main(void)
 {
-	uint8_t mask;
 	
-	CLKPR=_BV(CLKPCE);
-	CLKPR=0;			// set clock prescaler to 1 (attiny 25/45/85/24/44/84/13/13A)		
+	//CLKPR=_BV(CLKPCE);
+	//CLKPR=0;			// set clock prescaler to 1 (attiny 25/45/85/24/44/84/13/13A)		
+	uint8_t mask;
 	mask=_BV(PB4);
 	DDRB|=mask;
 	
+	/*
 	while(1)
     {
 		uint8_t led[3];
 
-		led[0]=32;led[1]=32;led[2]=32;
+		led[0]=255;led[1]=0;led[2]=0;
 		ws2812_sendarray_mask(&led[0], 3, _BV(PB4));
-		_delay_ms(500);
+		_delay_ms(1000);
 		
-		led[0]=32;led[1]=0;led[2]=0;
+		led[0]=0;led[1]=255;led[2]=0;
 		ws2812_sendarray_mask(&led[0], 3, _BV(PB4));
-		_delay_ms(500);
+		_delay_ms(1000);
 
-		/*
-		uint8_t i;
-		
-		led[0].r=32;led[0].g=32;led[0].b=32;
-
-		ws2812_sendarray(&led[0],3);
-		_delay_ms(500);
-		
-		led[0].r=32;led[0].g=0;led[0].b=0;
-	
-		ws2812_sendarray(&led[0],3);
-		_delay_ms(500);
-		*/
-	
+		led[0]=0;led[1]=0;led[2]=255;
+		ws2812_sendarray_mask(&led[0], 3, _BV(PB4));
+		_delay_ms(1000);
     } 
+	*/
 
 	uchar   i;
 
@@ -389,6 +395,7 @@ int main(void)
      * That's the way we need D+ and D-. Therefore we don't need any
      * additional hardware initialization.
      */
+
     usbInit();
     usbDeviceDisconnect();  /* enforce re-enumeration, do this while interrupts are disabled! */
     i = 0;
@@ -398,15 +405,13 @@ int main(void)
     }
     usbDeviceConnect();
 	
-
-
-
-    LED_PORT_DDR |= _BV(R_BIT);   /* make the LED bit an output */
-    LED_PORT_DDR |= _BV(G_BIT);   /* make the LED bit an output */
-    LED_PORT_DDR |= _BV(B_BIT);   /* make the LED bit an output */
-	pwmInit();
+    //LED_PORT_DDR |= _BV(R_BIT);   /* make the LED bit an output */
+    //LED_PORT_DDR |= _BV(G_BIT);   /* make the LED bit an output */
+    //LED_PORT_DDR |= _BV(B_BIT);   /* make the LED bit an output */
+	//pwmInit();
 
     sei();
+
 
     for(;;){                /* main event loop */
         wdt_reset();
