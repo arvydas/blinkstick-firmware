@@ -121,8 +121,8 @@ uchar usbFunctionWrite(uchar *data, uchar len)
 		//Only send data if the color has changed
 		if (data[2] != r || data[1] != g || data[3] != b)
 		{
-			r = data[2];
-			g = data[1];
+			r = data[1];
+			g = data[2];
 			b = data[3];
 
 
