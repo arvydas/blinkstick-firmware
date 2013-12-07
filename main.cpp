@@ -118,15 +118,24 @@ uchar usbFunctionWrite(uchar *data, uchar len)
 {
 	if (reportId == 1)
 	{
-		uint8_t led[3];
+		//Only send data if the color has changed
+		if (data[2] != r || data[1] != g || data[3] != b)
+		{
+			r = data[2];
+			g = data[1];
+			b = data[3];
 
-		led[0]=data[2];
-		led[1]=data[1];
-		led[2]=data[3];
 
-		cli(); //Disable interrupts
-		ws2812_sendarray_mask(&led[0], 3, _BV(PB4));
-		sei(); //Enable interrupts
+			uint8_t led[3];
+			
+			led[0]=data[2];
+			led[1]=data[1];
+			led[2]=data[3];
+
+			cli(); //Disable interrupts
+			ws2812_sendarray_mask(&led[0], 3, _BV(PB1));
+			sei(); //Enable interrupts
+		}
 
 		return 1;
 	}
@@ -200,6 +209,7 @@ extern "C" usbMsgLen_t usbFunctionSetup(uchar data[8])
 	usbRequest_t    *rq = (usbRequest_t *)data;
 	reportId = rq->wValue.bytes[0];
 
+	/* this code is no longer needed
     if((rq->bmRequestType & USBRQ_TYPE_MASK) == USBRQ_TYPE_VENDOR)
 	{
 		switch(rq->bRequest)
@@ -218,16 +228,18 @@ extern "C" usbMsgLen_t usbFunctionSetup(uchar data[8])
 			break;	
 		}
     }
-	else if((rq->bmRequestType & USBRQ_TYPE_MASK) == USBRQ_TYPE_CLASS){ /* HID class request */
+	else 
+	*/
+	if((rq->bmRequestType & USBRQ_TYPE_MASK) == USBRQ_TYPE_CLASS){ /* HID class request */
         if(rq->bRequest == USBRQ_HID_GET_REPORT){ /* wValue: ReportType (highbyte), ReportID (lowbyte) */
 			 usbMsgPtr = replyBuffer;
 
 			 if(reportId == 1){ //Device colors
 				 
 				replyBuffer[0] = 1; //report id
-				replyBuffer[1] = 255 - OCR1B;
-				replyBuffer[2] = 255 - OCR0B;
-				replyBuffer[3] = 255 - OCR0A;
+				replyBuffer[1] = r; //255 - OCR1B;
+				replyBuffer[2] = g; //255 - OCR0B;
+				replyBuffer[3] = b; //255 - OCR0A;
 
 				return 4;
 				 
@@ -366,7 +378,7 @@ int main(void)
     }
     usbDeviceConnect();
 	
-	DDRB |= _BV(PB4);
+	DDRB |= _BV(PB1);
 	
     //LED_PORT_DDR |= _BV(R_BIT);   /* make the LED bit an output */
     //LED_PORT_DDR |= _BV(G_BIT);   /* make the LED bit an output */
@@ -374,7 +386,6 @@ int main(void)
 	//pwmInit();
 
     sei();
-
 
     for(;;){                /* main event loop */
         wdt_reset();
