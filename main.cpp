@@ -385,6 +385,15 @@ int main(void)
     //LED_PORT_DDR |= _BV(B_BIT);   /* make the LED bit an output */
 	//pwmInit();
 
+
+	uint8_t led[3];
+	
+	led[0]=32; led[1]=32; led[2]=32;
+	ws2812_sendarray_mask(&led[0], 3, _BV(PB1));
+    _delay_ms(10);
+	led[0]=0; led[1]=0; led[2]=0;
+	ws2812_sendarray_mask(&led[0], 3, _BV(PB1));
+
     sei();
 
     for(;;){                /* main event loop */
