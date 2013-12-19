@@ -47,7 +47,7 @@ const PROGMEM char usbHidReportDescriptor[USB_CFG_HID_REPORT_DESCRIPTOR_LENGTH] 
     0x26, 0xff, 0x00,              //   LOGICAL_MAXIMUM (255)
     0x75, 0x08,                    //   REPORT_SIZE (8)
     0x85, 0x01,                    //   REPORT_ID (1)
-    0x95, 0x03,                    //   REPORT_COUNT (3)
+    0x95, 0x04,                    //   REPORT_COUNT (3)
     0x09, 0x00,                    //   USAGE (Undefined)
     0xb2, 0x02, 0x01,              //   FEATURE (Data,Var,Abs,Buf)
     0x85, 0x02,                    //   REPORT_ID (2)
@@ -119,21 +119,30 @@ uchar usbFunctionWrite(uchar *data, uchar len)
 	if (reportId == 1)
 	{
 		//Only send data if the color has changed
-		if (data[2] != r || data[1] != g || data[3] != b)
+		//if (data[2] != r || data[1] != g || data[3] != b)
 		{
 			r = data[1];
 			g = data[2];
 			b = data[3];
 
-
 			uint8_t led[3];
 			
+			cli(); //Disable interrupts
+			
+			led[0]=0;
+			led[1]=0;
+			led[2]=0;
+
+			for (int i=0; i < data[4]; i++)
+			{
+				ws2812_sendarray_mask(&led[0], 3, _BV(PB4));
+			}
+
 			led[0]=data[2];
 			led[1]=data[1];
 			led[2]=data[3];
 
-			cli(); //Disable interrupts
-			ws2812_sendarray_mask(&led[0], 3, _BV(PB1));
+			ws2812_sendarray_mask(&led[0], 3, _BV(PB4));
 			sei(); //Enable interrupts
 		}
 
@@ -378,7 +387,7 @@ int main(void)
     }
     usbDeviceConnect();
 	
-	DDRB |= _BV(PB1);
+	DDRB |= _BV(PB4);
 	
     //LED_PORT_DDR |= _BV(R_BIT);   /* make the LED bit an output */
     //LED_PORT_DDR |= _BV(G_BIT);   /* make the LED bit an output */
@@ -388,11 +397,15 @@ int main(void)
 
 	uint8_t led[3];
 	
+	//PB4 - R
+	//PB1 - G
+	//PB0 - B
+	
 	led[0]=32; led[1]=32; led[2]=32;
-	ws2812_sendarray_mask(&led[0], 3, _BV(PB1));
+	ws2812_sendarray_mask(&led[0], 3, _BV(PB4));
     _delay_ms(10);
 	led[0]=0; led[1]=0; led[2]=0;
-	ws2812_sendarray_mask(&led[0], 3, _BV(PB1));
+	ws2812_sendarray_mask(&led[0], 3, _BV(PB4));
 
     sei();
 
