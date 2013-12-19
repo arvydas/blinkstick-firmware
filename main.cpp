@@ -58,6 +58,10 @@ const PROGMEM char usbHidReportDescriptor[USB_CFG_HID_REPORT_DESCRIPTOR_LENGTH] 
     0x95, 0x20,                    //   REPORT_COUNT (32)
     0x09, 0x00,                    //   USAGE (Undefined)
     0xb2, 0x02, 0x01,              //   FEATURE (Data,Var,Abs,Buf)
+    0x85, 0x04,                    //   REPORT_ID (4)
+    0x95, 0xC1,                    //   REPORT_COUNT (193)
+    0x09, 0x00,                    //   USAGE (Undefined)
+    0xb2, 0x02, 0x01,              //   FEATURE (Data,Var,Abs,Buf)
     0xc0                           // END_COLLECTION
 };
 
@@ -71,6 +75,9 @@ static uchar bytesRemaining;
 static uchar reportId = 0; 
 
 static uchar replyBuffer[33]; //32 for data + 1 for report id
+
+struct CRGB { uint8_t g; uint8_t r; uint8_t b; };
+struct CRGB led[64];
 
 /* usbFunctionRead() is called when the host requests a chunk of data from
 * the device. 
@@ -118,6 +125,7 @@ uchar usbFunctionWrite(uchar *data, uchar len)
 {
 	if (reportId == 1)
 	{
+		/*
 		//Only send data if the color has changed
 		//if (data[2] != r || data[1] != g || data[3] != b)
 		{
@@ -145,6 +153,19 @@ uchar usbFunctionWrite(uchar *data, uchar len)
 			ws2812_sendarray_mask(&led[0], 3, _BV(PB4));
 			sei(); //Enable interrupts
 		}
+		*/
+
+		uint8_t index = data[4];
+
+		led[index].r = data[1];
+		led[index].g = data[2];
+		led[index].b = data[3];
+
+		cli(); //Disable interrupts
+		for (int i = 0; i < index + 1; i++) {
+			ws2812_sendarray_mask((uint8_t *)&led[i], 3, _BV(PB4));
+		}
+		sei(); //Enable interrupts
 
 		return 1;
 	}
@@ -171,6 +192,34 @@ uchar usbFunctionWrite(uchar *data, uchar len)
 		}
 
 		return bytesRemaining == 0; // return 1 if this was the last chunk 
+	}
+	else if (reportId == 4)
+	{
+		if(bytesRemaining == 0)
+			return 1; // end of transfer 
+
+		if(len > bytesRemaining)
+			len = bytesRemaining;
+
+		//Ignore the first byte of data as it's report id
+		if (currentAddress == 0)
+		{
+			for (int i = 0; i < len; i++)
+			{
+				
+			}
+		}
+
+		currentAddress += len;
+		bytesRemaining -= len;
+
+		for (int i = 0; i < 64; i++)
+		{
+			led[i].r = data[i * 3 + 1];
+			led[i].g = data[i * 3 + 2];
+			led[i].b = data[i * 3 + 3];
+		}
+
 	}
 	else
 	{
@@ -294,6 +343,11 @@ extern "C" usbMsgLen_t usbFunctionSetup(uchar data[8])
 				bytesRemaining = 32;
 
 				addressOffset = 64;
+				return USB_NO_MSG; /* use usbFunctionWrite() to receive data from host */
+			 }
+			 else if (reportId == 4) { // Serial data for 64 LEDs
+				bytesRemaining = 193;
+				currentAddress = 0;
 				return USB_NO_MSG; /* use usbFunctionWrite() to receive data from host */
 			 }
 			 return 0;
