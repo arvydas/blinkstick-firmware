@@ -33,7 +33,7 @@ extern "C"
 
 //if descriptor changes, USB_CFG_HID_REPORT_DESCRIPTOR_LENGTH also has to be updated in usbconfig.h
 
-#define MAX_LEDS	32
+#define MAX_LEDS	64
 
 const PROGMEM char usbHidReportDescriptor[USB_CFG_HID_REPORT_DESCRIPTOR_LENGTH] = {    /* USB report descriptor */
 
