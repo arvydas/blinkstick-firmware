@@ -38,6 +38,8 @@ extern "C"
 
 //if descriptor changes, USB_CFG_HID_REPORT_DESCRIPTOR_LENGTH also has to be updated in usbconfig.h
 
+#define MAX_LEDS	8
+
 const PROGMEM char usbHidReportDescriptor[USB_CFG_HID_REPORT_DESCRIPTOR_LENGTH] = {    /* USB report descriptor */
 
     0x06, 0x00, 0xff,              // USAGE_PAGE (Generic Desktop)
@@ -59,7 +61,7 @@ const PROGMEM char usbHidReportDescriptor[USB_CFG_HID_REPORT_DESCRIPTOR_LENGTH] 
     0x09, 0x00,                    //   USAGE (Undefined)
     0xb2, 0x02, 0x01,              //   FEATURE (Data,Var,Abs,Buf)
     0x85, 0x04,                    //   REPORT_ID (4)
-    0x95, 0xC1,                    //   REPORT_COUNT (193)
+    0x95, MAX_LEDS * 3,            //   REPORT_COUNT (193)
     0x09, 0x00,                    //   USAGE (Undefined)
     0xb2, 0x02, 0x01,              //   FEATURE (Data,Var,Abs,Buf)
     0xc0                           // END_COLLECTION
@@ -76,8 +78,7 @@ static uchar reportId = 0;
 
 static uchar replyBuffer[33]; //32 for data + 1 for report id
 
-struct CRGB { uint8_t g; uint8_t r; uint8_t b; };
-struct CRGB led[64];
+static uint8_t led[MAX_LEDS * 3];
 
 /* usbFunctionRead() is called when the host requests a chunk of data from
 * the device. 
@@ -157,14 +158,17 @@ uchar usbFunctionWrite(uchar *data, uchar len)
 
 		uint8_t index = data[4];
 
-		led[index].r = data[1];
-		led[index].g = data[2];
-		led[index].b = data[3];
+		led[index * 3 + 0] = data[2];
+		led[index * 3 + 1] = data[1];
+		led[index * 3 + 2] = data[3];
 
 		cli(); //Disable interrupts
+		ws2812_sendarray_mask(&led[0], (index + 1) * 3, _BV(PB4));
+		/*
 		for (int i = 0; i < index + 1; i++) {
-			ws2812_sendarray_mask((uint8_t *)&led[i], 3, _BV(PB4));
+			ws2812_sendarray_mask(&led[0], 3, _BV(PB4));
 		}
+		*/
 		sei(); //Enable interrupts
 
 		return 1;
@@ -195,8 +199,14 @@ uchar usbFunctionWrite(uchar *data, uchar len)
 	}
 	else if (reportId == 4)
 	{
-		if(bytesRemaining == 0)
+		if (bytesRemaining == 0)
+		{
+			cli(); //Disable interrupts
+   			ws2812_sendarray_mask(&led[0], MAX_LEDS * 3, _BV(PB4));
+			sei(); //Enable interrupts
+
 			return 1; // end of transfer 
+		}
 
 		if(len > bytesRemaining)
 			len = bytesRemaining;
@@ -204,22 +214,34 @@ uchar usbFunctionWrite(uchar *data, uchar len)
 		//Ignore the first byte of data as it's report id
 		if (currentAddress == 0)
 		{
+			for (int i = 1; i < len; i++)
+			{
+				led[currentAddress + i - 1] = data[i];
+			}
+
+			currentAddress += len - 1;
+			bytesRemaining -= (len - 1);
+		}
+		else
+		{
 			for (int i = 0; i < len; i++)
 			{
-				
+				led[currentAddress + i] = data[i];
 			}
+
+			currentAddress += len;
+			bytesRemaining -= len;
 		}
 
-		currentAddress += len;
-		bytesRemaining -= len;
 
-		for (int i = 0; i < 64; i++)
+		if (bytesRemaining <= 0)
 		{
-			led[i].r = data[i * 3 + 1];
-			led[i].g = data[i * 3 + 2];
-			led[i].b = data[i * 3 + 3];
+			cli(); //Disable interrupts
+   			ws2812_sendarray_mask(&led[0], MAX_LEDS * 3, _BV(PB4));
+			sei(); //Enable interrupts
 		}
 
+		return bytesRemaining == 0; // return 1 if this was the last chunk 
 	}
 	else
 	{
@@ -346,8 +368,9 @@ extern "C" usbMsgLen_t usbFunctionSetup(uchar data[8])
 				return USB_NO_MSG; /* use usbFunctionWrite() to receive data from host */
 			 }
 			 else if (reportId == 4) { // Serial data for 64 LEDs
-				bytesRemaining = 193;
+				bytesRemaining = MAX_LEDS * 3;
 				currentAddress = 0;
+				addressOffset = 0;
 				return USB_NO_MSG; /* use usbFunctionWrite() to receive data from host */
 			 }
 			 return 0;
