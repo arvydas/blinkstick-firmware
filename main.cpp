@@ -38,7 +38,7 @@ extern "C"
 
 //if descriptor changes, USB_CFG_HID_REPORT_DESCRIPTOR_LENGTH also has to be updated in usbconfig.h
 
-#define MAX_LEDS	8
+#define MAX_LEDS	64
 
 const PROGMEM char usbHidReportDescriptor[USB_CFG_HID_REPORT_DESCRIPTOR_LENGTH] = {    /* USB report descriptor */
 
@@ -66,10 +66,6 @@ const PROGMEM char usbHidReportDescriptor[USB_CFG_HID_REPORT_DESCRIPTOR_LENGTH] 
     0xb2, 0x02, 0x01,              //   FEATURE (Data,Var,Abs,Buf)
     0xc0                           // END_COLLECTION
 };
-
-static volatile uint8_t r = 0;
-static volatile uint8_t g = 0;
-static volatile uint8_t b = 0;
 
 static uchar currentAddress;
 static uchar addressOffset;
@@ -317,9 +313,11 @@ extern "C" usbMsgLen_t usbFunctionSetup(uchar data[8])
 			 if(reportId == 1){ //Device colors
 				 
 				replyBuffer[0] = 1; //report id
+				/*
 				replyBuffer[1] = r; //255 - OCR1B;
 				replyBuffer[2] = g; //255 - OCR0B;
 				replyBuffer[3] = b; //255 - OCR0A;
+				*/
 
 				return 4;
 				 
