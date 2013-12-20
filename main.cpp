@@ -24,11 +24,6 @@
 extern "C"
 {
 	#include "usbdrv.h"
-}
-#include "oddebug.h"        /* This is also an example for using debug macros */
-#include "requests.h"       /* The custom request numbers we use */
-extern "C"
-{
 	#include "light_ws2812.h"
 }
 
@@ -38,7 +33,7 @@ extern "C"
 
 //if descriptor changes, USB_CFG_HID_REPORT_DESCRIPTOR_LENGTH also has to be updated in usbconfig.h
 
-#define MAX_LEDS	64
+#define MAX_LEDS	32
 
 const PROGMEM char usbHidReportDescriptor[USB_CFG_HID_REPORT_DESCRIPTOR_LENGTH] = {    /* USB report descriptor */
 
@@ -122,36 +117,6 @@ uchar usbFunctionWrite(uchar *data, uchar len)
 {
 	if (reportId == 1)
 	{
-		/*
-		//Only send data if the color has changed
-		//if (data[2] != r || data[1] != g || data[3] != b)
-		{
-			r = data[1];
-			g = data[2];
-			b = data[3];
-
-			uint8_t led[3];
-			
-			cli(); //Disable interrupts
-			
-			led[0]=0;
-			led[1]=0;
-			led[2]=0;
-
-			for (int i=0; i < data[4]; i++)
-			{
-				ws2812_sendarray_mask(&led[0], 3, _BV(PB4));
-			}
-
-			led[0]=data[2];
-			led[1]=data[1];
-			led[2]=data[3];
-
-			ws2812_sendarray_mask(&led[0], 3, _BV(PB4));
-			sei(); //Enable interrupts
-		}
-		*/
-
 		uint8_t index = data[4];
 
 		led[index * 3 + 0] = data[2];
@@ -160,11 +125,6 @@ uchar usbFunctionWrite(uchar *data, uchar len)
 
 		cli(); //Disable interrupts
 		ws2812_sendarray_mask(&led[0], (index + 1) * 3, _BV(PB4));
-		/*
-		for (int i = 0; i < index + 1; i++) {
-			ws2812_sendarray_mask(&led[0], 3, _BV(PB4));
-		}
-		*/
 		sei(); //Enable interrupts
 
 		return 1;
@@ -272,7 +232,7 @@ static void SetSerial(void)
 
    for (int i =0; i < SERIAL_NUMBER_LENGTH; i++)
    {
-	serialNumberDescriptor[i +1] = serialNumber[i];
+		serialNumberDescriptor[i +1] = serialNumber[i];
    }
 }
 
@@ -469,9 +429,6 @@ int main(void)
     //LED_PORT_DDR |= _BV(B_BIT);   /* make the LED bit an output */
 	//pwmInit();
 
-
-	uint8_t led[3];
-	
 	//PB4 - R
 	//PB1 - G
 	//PB0 - B
