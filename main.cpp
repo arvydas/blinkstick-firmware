@@ -67,7 +67,7 @@ static uchar addressOffset;
 static uchar bytesRemaining;
 static uchar reportId = 0; 
 
-static uchar replyBuffer[33]; //32 for data + 1 for report id
+//static uchar ledColorBuffer[4]; //3 for data + 1 for report id
 
 static uint8_t led[MAX_LEDS * 3];
 
@@ -78,8 +78,11 @@ uchar usbFunctionRead(uchar *data, uchar len)
 {
 	if (reportId == 1)
 	{
-		//Not used
-		return 0;
+		data[0] = 1;
+		data[1] = led[1];
+		data[2] = led[0];
+		data[3] = led[2];
+		return 4;
 	}
 	else if (reportId == 2 || reportId == 3)
 	{
@@ -268,23 +271,10 @@ extern "C" usbMsgLen_t usbFunctionSetup(uchar data[8])
 	*/
 	if((rq->bmRequestType & USBRQ_TYPE_MASK) == USBRQ_TYPE_CLASS){ /* HID class request */
         if(rq->bRequest == USBRQ_HID_GET_REPORT){ /* wValue: ReportType (highbyte), ReportID (lowbyte) */
-			 usbMsgPtr = replyBuffer;
-
 			 if(reportId == 1){ //Device colors
-				 
-				replyBuffer[0] = 1; //report id
-				/*
-				replyBuffer[1] = r; //255 - OCR1B;
-				replyBuffer[2] = g; //255 - OCR0B;
-				replyBuffer[3] = b; //255 - OCR0A;
-				*/
-
-				return 4;
-				 
+				return USB_NO_MSG;
 			 }
 			 else if(reportId == 2){ // Name of the device
-				 replyBuffer[0] = 2; //report id
-
 				 bytesRemaining = 33;
 				 currentAddress = 0;
 
@@ -293,8 +283,6 @@ extern "C" usbMsgLen_t usbFunctionSetup(uchar data[8])
 				 return USB_NO_MSG; /* use usbFunctionRead() to obtain data */
 			 }
 			 else if(reportId == 3){ // Name of the device
-				 replyBuffer[0] = 3; //report id
-
 				 bytesRemaining = 33;
 				 currentAddress = 0;
 
