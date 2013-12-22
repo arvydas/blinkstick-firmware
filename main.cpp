@@ -59,6 +59,14 @@ const PROGMEM char usbHidReportDescriptor[USB_CFG_HID_REPORT_DESCRIPTOR_LENGTH] 
     0x95, MAX_LEDS * 3,            //   REPORT_COUNT (193)
     0x09, 0x00,                    //   USAGE (Undefined)
     0xb2, 0x02, 0x01,              //   FEATURE (Data,Var,Abs,Buf)
+    0x85, 0x05,                    //   REPORT_ID (5)
+    0x95, MAX_LEDS * 3,            //   REPORT_COUNT (193)
+    0x09, 0x00,                    //   USAGE (Undefined)
+    0xb2, 0x02, 0x01,              //   FEATURE (Data,Var,Abs,Buf)
+    0x85, 0x06,                    //   REPORT_ID (6)
+    0x95, MAX_LEDS * 3,            //   REPORT_COUNT (193)
+    0x09, 0x00,                    //   USAGE (Undefined)
+    0xb2, 0x02, 0x01,              //   FEATURE (Data,Var,Abs,Buf)
     0xc0                           // END_COLLECTION
 };
 
@@ -156,12 +164,26 @@ uchar usbFunctionWrite(uchar *data, uchar len)
 
 		return bytesRemaining == 0; // return 1 if this was the last chunk 
 	}
-	else if (reportId == 4)
+	else if (reportId == 4 || reportId == 5 || reportId == 6)
 	{
+		int pin = PB4;
+		if (reportId == 4)
+		{
+			pin = PB4;
+		}
+		else if (reportId == 5)
+		{
+			pin = PB1;
+		}
+		else if (reportId == 6)
+		{
+			pin = PB0;
+		}
+
 		if (bytesRemaining == 0)
 		{
 			cli(); //Disable interrupts
-   			ws2812_sendarray_mask(&led[0], MAX_LEDS * 3, _BV(PB4));
+   			ws2812_sendarray_mask(&led[0], MAX_LEDS * 3, _BV(pin));
 			sei(); //Enable interrupts
 
 			return 1; // end of transfer 
@@ -196,7 +218,7 @@ uchar usbFunctionWrite(uchar *data, uchar len)
 		if (bytesRemaining <= 0)
 		{
 			cli(); //Disable interrupts
-   			ws2812_sendarray_mask(&led[0], MAX_LEDS * 3, _BV(PB4));
+   			ws2812_sendarray_mask(&led[0], MAX_LEDS * 3, _BV(pin));
 			sei(); //Enable interrupts
 		}
 
@@ -313,7 +335,7 @@ extern "C" usbMsgLen_t usbFunctionSetup(uchar data[8])
 				addressOffset = 64;
 				return USB_NO_MSG; /* use usbFunctionWrite() to receive data from host */
 			 }
-			 else if (reportId == 4) { // Serial data for 64 LEDs
+			 else if (reportId == 4 || reportId == 5 || reportId == 6) { // Serial data for 64 LEDs
 				bytesRemaining = MAX_LEDS * 3;
 				currentAddress = 0;
 				addressOffset = 0;
@@ -411,6 +433,8 @@ int main(void)
     usbDeviceConnect();
 	
 	DDRB |= _BV(PB4);
+	DDRB |= _BV(PB1);
+	DDRB |= _BV(PB0);
 	
     //LED_PORT_DDR |= _BV(R_BIT);   /* make the LED bit an output */
     //LED_PORT_DDR |= _BV(G_BIT);   /* make the LED bit an output */
