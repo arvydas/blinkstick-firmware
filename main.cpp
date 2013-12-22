@@ -33,7 +33,21 @@ extern "C"
 
 //if descriptor changes, USB_CFG_HID_REPORT_DESCRIPTOR_LENGTH also has to be updated in usbconfig.h
 
-#define MAX_LEDS	64
+#define MAX_LEDS		128
+#define MIN_LED_FRAME	8 * 3
+
+/* 
+	Reports:
+		1: LED Data [R, G, B, INDEX]
+		2: Name [Binary Data 0..32]
+		3: Data [Binary Data 0..32]
+		4: LED Frame [Channel, [G, R, B][0..7]]
+		5: LED Frame [Channel, [G, R, B][0..15]]
+		6: LED Frame [Channel, [G, R, B][0..31]]
+		7: LED Frame [Channel, [G, R, B][0..63]]
+		8: LED Frame [Channel, [G, R, B][0..63]]
+		9: LED Frame [Channel, [G, R, B][64..127]] - sends changes
+*/
 
 const PROGMEM char usbHidReportDescriptor[USB_CFG_HID_REPORT_DESCRIPTOR_LENGTH] = {    /* USB report descriptor */
 
@@ -56,15 +70,27 @@ const PROGMEM char usbHidReportDescriptor[USB_CFG_HID_REPORT_DESCRIPTOR_LENGTH] 
     0x09, 0x00,                    //   USAGE (Undefined)
     0xb2, 0x02, 0x01,              //   FEATURE (Data,Var,Abs,Buf)
     0x85, 0x04,                    //   REPORT_ID (4)
-    0x95, MAX_LEDS * 3,            //   REPORT_COUNT (193)
+    0x95, MIN_LED_FRAME + 1,       //   REPORT_COUNT (193)
     0x09, 0x00,                    //   USAGE (Undefined)
     0xb2, 0x02, 0x01,              //   FEATURE (Data,Var,Abs,Buf)
     0x85, 0x05,                    //   REPORT_ID (5)
-    0x95, MAX_LEDS * 3,            //   REPORT_COUNT (193)
+    0x95, MIN_LED_FRAME * 2 + 1,   //   REPORT_COUNT (193)
     0x09, 0x00,                    //   USAGE (Undefined)
     0xb2, 0x02, 0x01,              //   FEATURE (Data,Var,Abs,Buf)
     0x85, 0x06,                    //   REPORT_ID (6)
-    0x95, MAX_LEDS * 3,            //   REPORT_COUNT (193)
+    0x95, MIN_LED_FRAME * 4 + 1,   //   REPORT_COUNT (193)
+    0x09, 0x00,                    //   USAGE (Undefined)
+    0xb2, 0x02, 0x01,              //   FEATURE (Data,Var,Abs,Buf)
+    0x85, 0x07,                    //   REPORT_ID (7)
+    0x95, MIN_LED_FRAME * 8 + 1,   //   REPORT_COUNT (193)
+    0x09, 0x00,                    //   USAGE (Undefined)
+    0xb2, 0x02, 0x01,              //   FEATURE (Data,Var,Abs,Buf)
+    0x85, 0x08,                    //   REPORT_ID (8)
+    0x95, MIN_LED_FRAME * 8 + 1,   //   REPORT_COUNT (193)
+    0x09, 0x00,                    //   USAGE (Undefined)
+    0xb2, 0x02, 0x01,              //   FEATURE (Data,Var,Abs,Buf)
+    0x85, 0x09,                    //   REPORT_ID (9)
+    0x95, MIN_LED_FRAME * 8 + 1,   //   REPORT_COUNT (193)
     0x09, 0x00,                    //   USAGE (Undefined)
     0xb2, 0x02, 0x01,              //   FEATURE (Data,Var,Abs,Buf)
     0xc0                           // END_COLLECTION
@@ -74,6 +100,7 @@ static uchar currentAddress;
 static uchar addressOffset;
 static uchar bytesRemaining;
 static uchar reportId = 0; 
+static int channelPin;
 
 //static uchar ledColorBuffer[4]; //3 for data + 1 for report id
 
@@ -164,27 +191,17 @@ uchar usbFunctionWrite(uchar *data, uchar len)
 
 		return bytesRemaining == 0; // return 1 if this was the last chunk 
 	}
-	else if (reportId == 4 || reportId == 5 || reportId == 6)
+	else if (reportId >= 4 && reportId <= 9) // Serial data for LEDs
 	{
-		int pin = PB4;
-		if (reportId == 4)
-		{
-			pin = PB4;
-		}
-		else if (reportId == 5)
-		{
-			pin = PB1;
-		}
-		else if (reportId == 6)
-		{
-			pin = PB0;
-		}
 
 		if (bytesRemaining == 0)
 		{
-			cli(); //Disable interrupts
-   			ws2812_sendarray_mask(&led[0], MAX_LEDS * 3, _BV(pin));
-			sei(); //Enable interrupts
+			if (reportId != 8)
+			{
+				cli(); //Disable interrupts
+				ws2812_sendarray_mask(&led[0], MAX_LEDS * 3, _BV(channelPin));
+				sei(); //Enable interrupts
+			}
 
 			return 1; // end of transfer 
 		}
@@ -195,19 +212,31 @@ uchar usbFunctionWrite(uchar *data, uchar len)
 		//Ignore the first byte of data as it's report id
 		if (currentAddress == 0)
 		{
-			for (int i = 1; i < len; i++)
+			//Second byte is channel id
+			channelPin = PB4; //R
+
+			if (data[1] == 1) //G
 			{
-				led[currentAddress + i - 1] = data[i];
+				channelPin = PB1;
+			}
+			else if (data[1] == 2) //B
+			{
+				channelPin = PB0;
 			}
 
-			currentAddress += len - 1;
+			for (int i = 2; i < len; i++)
+			{
+				led[addressOffset + currentAddress + i - 2] = data[i];
+			}
+
+			currentAddress += len - 2;
 			bytesRemaining -= (len - 1);
 		}
 		else
 		{
 			for (int i = 0; i < len; i++)
 			{
-				led[currentAddress + i] = data[i];
+				led[addressOffset + currentAddress + i] = data[i];
 			}
 
 			currentAddress += len;
@@ -217,9 +246,12 @@ uchar usbFunctionWrite(uchar *data, uchar len)
 
 		if (bytesRemaining <= 0)
 		{
-			cli(); //Disable interrupts
-   			ws2812_sendarray_mask(&led[0], MAX_LEDS * 3, _BV(pin));
-			sei(); //Enable interrupts
+			if (reportId != 8)
+			{
+				cli(); //Disable interrupts
+				ws2812_sendarray_mask(&led[0], MAX_LEDS * 3, _BV(channelPin));
+				sei(); //Enable interrupts
+			}
 		}
 
 		return bytesRemaining == 0; // return 1 if this was the last chunk 
@@ -335,11 +367,34 @@ extern "C" usbMsgLen_t usbFunctionSetup(uchar data[8])
 				addressOffset = 64;
 				return USB_NO_MSG; /* use usbFunctionWrite() to receive data from host */
 			 }
-			 else if (reportId == 4 || reportId == 5 || reportId == 6) { // Serial data for 64 LEDs
-				bytesRemaining = MAX_LEDS * 3;
-				currentAddress = 0;
-				addressOffset = 0;
-				return USB_NO_MSG; /* use usbFunctionWrite() to receive data from host */
+			 else if (reportId >= 4 && reportId <= 9) { // Serial data for LEDs
+				 currentAddress = 0;
+				 addressOffset = 0;
+
+				 switch (reportId) {
+					case 4:
+					    bytesRemaining = MIN_LED_FRAME * 1 + 1;
+					    break;
+					case 5:
+					    bytesRemaining = MIN_LED_FRAME * 2 + 1;
+					    break;
+					case 6:
+					    bytesRemaining = MIN_LED_FRAME * 4 + 1;
+					    break;
+					case 7:
+					    bytesRemaining = MIN_LED_FRAME * 8 + 1;
+					    break;
+					case 8:
+					    bytesRemaining = MIN_LED_FRAME * 8 + 1;
+					    break;
+					case 9:
+					    bytesRemaining = MIN_LED_FRAME * 8 + 1;
+						addressOffset = 64 * 3;
+					    break;
+				 }
+
+
+				 return USB_NO_MSG; /* use usbFunctionWrite() to receive data from host */
 			 }
 			 return 0;
         }
