@@ -38,15 +38,17 @@ extern "C"
 
 /* 
 	Reports:
-		1: LED Data [R, G, B, INDEX]
+		1: LED Data [R, G, B]
 		2: Name [Binary Data 0..32]
 		3: Data [Binary Data 0..32]
-		4: LED Frame [Channel, [G, R, B][0..7]]
-		5: LED Frame [Channel, [G, R, B][0..15]]
-		6: LED Frame [Channel, [G, R, B][0..31]]
-		7: LED Frame [Channel, [G, R, B][0..63]]
-		8: LED Frame [Channel, [G, R, B][0..63]]
-		9: LED Frame [Channel, [G, R, B][64..127]] - sends changes
+		4: Mode set [MODE]: 0 - RGB LED Strip, 1 - WS2812
+		5: LED Data [CHANNEL, INDEX, R, G, B]
+		6: LED Frame [Channel, [G, R, B][0..7]]
+		7: LED Frame [Channel, [G, R, B][0..15]]
+		8: LED Frame [Channel, [G, R, B][0..31]]
+		9: LED Frame [Channel, [G, R, B][0..63]]
+		A: LED Frame [Channel, [G, R, B][0..63]]
+		B: LED Frame [Channel, [G, R, B][64..127]] - sends changes
 */
 
 const PROGMEM char usbHidReportDescriptor[USB_CFG_HID_REPORT_DESCRIPTOR_LENGTH] = {    /* USB report descriptor */
@@ -58,7 +60,7 @@ const PROGMEM char usbHidReportDescriptor[USB_CFG_HID_REPORT_DESCRIPTOR_LENGTH] 
     0x26, 0xff, 0x00,              //   LOGICAL_MAXIMUM (255)
     0x75, 0x08,                    //   REPORT_SIZE (8)
     0x85, 0x01,                    //   REPORT_ID (1)
-    0x95, 0x04,                    //   REPORT_COUNT (3)
+    0x95, 0x03,                    //   REPORT_COUNT (3)
     0x09, 0x00,                    //   USAGE (Undefined)
     0xb2, 0x02, 0x01,              //   FEATURE (Data,Var,Abs,Buf)
     0x85, 0x02,                    //   REPORT_ID (2)
@@ -70,26 +72,34 @@ const PROGMEM char usbHidReportDescriptor[USB_CFG_HID_REPORT_DESCRIPTOR_LENGTH] 
     0x09, 0x00,                    //   USAGE (Undefined)
     0xb2, 0x02, 0x01,              //   FEATURE (Data,Var,Abs,Buf)
     0x85, 0x04,                    //   REPORT_ID (4)
-    0x95, MIN_LED_FRAME + 1,       //   REPORT_COUNT (193)
+    0x95, 0x01,                    //   REPORT_COUNT (1)
     0x09, 0x00,                    //   USAGE (Undefined)
     0xb2, 0x02, 0x01,              //   FEATURE (Data,Var,Abs,Buf)
     0x85, 0x05,                    //   REPORT_ID (5)
-    0x95, MIN_LED_FRAME * 2 + 1,   //   REPORT_COUNT (193)
+    0x95, 0x05,                    //   REPORT_COUNT (5)
     0x09, 0x00,                    //   USAGE (Undefined)
     0xb2, 0x02, 0x01,              //   FEATURE (Data,Var,Abs,Buf)
     0x85, 0x06,                    //   REPORT_ID (6)
-    0x95, MIN_LED_FRAME * 4 + 1,   //   REPORT_COUNT (193)
+    0x95, MIN_LED_FRAME + 1,       //   REPORT_COUNT (25)
     0x09, 0x00,                    //   USAGE (Undefined)
     0xb2, 0x02, 0x01,              //   FEATURE (Data,Var,Abs,Buf)
     0x85, 0x07,                    //   REPORT_ID (7)
-    0x95, MIN_LED_FRAME * 8 + 1,   //   REPORT_COUNT (193)
+    0x95, MIN_LED_FRAME * 2 + 1,   //   REPORT_COUNT (49)
     0x09, 0x00,                    //   USAGE (Undefined)
     0xb2, 0x02, 0x01,              //   FEATURE (Data,Var,Abs,Buf)
     0x85, 0x08,                    //   REPORT_ID (8)
-    0x95, MIN_LED_FRAME * 8 + 1,   //   REPORT_COUNT (193)
+    0x95, MIN_LED_FRAME * 4 + 1,   //   REPORT_COUNT (97)
     0x09, 0x00,                    //   USAGE (Undefined)
     0xb2, 0x02, 0x01,              //   FEATURE (Data,Var,Abs,Buf)
     0x85, 0x09,                    //   REPORT_ID (9)
+    0x95, MIN_LED_FRAME * 8 + 1,   //   REPORT_COUNT (193)
+    0x09, 0x00,                    //   USAGE (Undefined)
+    0xb2, 0x02, 0x01,              //   FEATURE (Data,Var,Abs,Buf)
+    0x85, 0x0A,                    //   REPORT_ID (10)
+    0x95, MIN_LED_FRAME * 8 + 1,   //   REPORT_COUNT (193)
+    0x09, 0x00,                    //   USAGE (Undefined)
+    0xb2, 0x02, 0x01,              //   FEATURE (Data,Var,Abs,Buf)
+    0x85, 0x0B,                    //   REPORT_ID (11)
     0x95, MIN_LED_FRAME * 8 + 1,   //   REPORT_COUNT (193)
     0x09, 0x00,                    //   USAGE (Undefined)
     0xb2, 0x02, 0x01,              //   FEATURE (Data,Var,Abs,Buf)
@@ -100,7 +110,7 @@ static uchar currentAddress;
 static uchar addressOffset;
 static uchar bytesRemaining;
 static uchar reportId = 0; 
-static int channelPin;
+static int channel;
 
 //static uchar ledColorBuffer[4]; //3 for data + 1 for report id
 
@@ -148,6 +158,21 @@ uchar usbFunctionRead(uchar *data, uchar len)
 
 }
 
+uchar channelToPin(uchar ch) {
+	if (ch == 1) //G
+	{
+		return _BV(PB1);
+	}
+	else if (ch == 2) //B
+	{
+		return _BV(PB0);
+	}
+	else 
+	{
+		return _BV(PB4); //R
+	}
+}
+
 /* usbFunctionWrite() is called when the host sends a chunk of data to the
 * device. 
 */
@@ -155,14 +180,13 @@ uchar usbFunctionWrite(uchar *data, uchar len)
 {
 	if (reportId == 1)
 	{
-		uint8_t index = data[4];
+		led[0] = data[2];
+		led[1] = data[1];
+		led[2] = data[3];
 
-		led[index * 3 + 0] = data[2];
-		led[index * 3 + 1] = data[1];
-		led[index * 3 + 2] = data[3];
-
+		//Set only the first LED on the first channel
 		cli(); //Disable interrupts
-		ws2812_sendarray_mask(&led[0], (index + 1) * 3, _BV(PB4));
+		ws2812_sendarray_mask(&led[0], 3, channelToPin(0));
 		sei(); //Enable interrupts
 
 		return 1;
@@ -191,15 +215,30 @@ uchar usbFunctionWrite(uchar *data, uchar len)
 
 		return bytesRemaining == 0; // return 1 if this was the last chunk 
 	}
-	else if (reportId >= 4 && reportId <= 9) // Serial data for LEDs
+	else if (reportId == 5)
+	{
+		channel = data[1];
+		uint8_t index = data[2];
+
+		led[index * 3 + 0] = data[4];
+		led[index * 3 + 1] = data[3];
+		led[index * 3 + 2] = data[5];
+
+		cli(); //Disable interrupts
+		ws2812_sendarray_mask(&led[0], (index + 1) * 3, channelToPin(channel));
+		sei(); //Enable interrupts
+
+		return 1;
+	}
+	else if (reportId >= 6 && reportId <= 11) // Serial data for LEDs
 	{
 
 		if (bytesRemaining == 0)
 		{
-			if (reportId != 8)
+			if (reportId != 10)
 			{
 				cli(); //Disable interrupts
-				ws2812_sendarray_mask(&led[0], MAX_LEDS * 3, _BV(channelPin));
+				ws2812_sendarray_mask(&led[0], MAX_LEDS * 3, channelToPin(channel));
 				sei(); //Enable interrupts
 			}
 
@@ -212,17 +251,7 @@ uchar usbFunctionWrite(uchar *data, uchar len)
 		//Ignore the first byte of data as it's report id
 		if (currentAddress == 0)
 		{
-			//Second byte is channel id
-			channelPin = PB4; //R
-
-			if (data[1] == 1) //G
-			{
-				channelPin = PB1;
-			}
-			else if (data[1] == 2) //B
-			{
-				channelPin = PB0;
-			}
+			channel = data[1];
 
 			for (int i = 2; i < len; i++)
 			{
@@ -246,10 +275,10 @@ uchar usbFunctionWrite(uchar *data, uchar len)
 
 		if (bytesRemaining <= 0)
 		{
-			if (reportId != 8)
+			if (reportId != 10)
 			{
 				cli(); //Disable interrupts
-				ws2812_sendarray_mask(&led[0], MAX_LEDS * 3, _BV(channelPin));
+				ws2812_sendarray_mask(&led[0], MAX_LEDS * 3, channelToPin(channel));
 				sei(); //Enable interrupts
 			}
 		}
@@ -334,15 +363,15 @@ extern "C" usbMsgLen_t usbFunctionSetup(uchar data[8])
 
 				 addressOffset = 32;
 
-				 return USB_NO_MSG; /* use usbFunctionRead() to obtain data */
+				 return USB_NO_MSG; 
 			 }
-			 else if(reportId == 3){ // Name of the device
+			 else if(reportId == 3){ // Data of the device
 				 bytesRemaining = 33;
 				 currentAddress = 0;
 
 				 addressOffset = 64;
 
-				 return USB_NO_MSG; /* use usbFunctionRead() to obtain data */
+				 return USB_NO_MSG; 
 			 }
 
 			 return 0;
@@ -351,43 +380,57 @@ extern "C" usbMsgLen_t usbFunctionSetup(uchar data[8])
 			 if(reportId == 1){ //Device colors
 				bytesRemaining = 3;
 				currentAddress = 0;
-				return USB_NO_MSG; /* use usbFunctionWrite() to receive data from host */
+				return USB_NO_MSG; 
 			 }
 			 else if(reportId == 2){ // Name of the device
 				currentAddress = 0;
 				bytesRemaining = 32;
 
 				addressOffset = 32;
-				return USB_NO_MSG; /* use usbFunctionWrite() to receive data from host */
+				return USB_NO_MSG; 
 			 }
 			 else if(reportId == 3){ // Name of the device
 				currentAddress = 0;
 				bytesRemaining = 32;
 
 				addressOffset = 64;
-				return USB_NO_MSG; /* use usbFunctionWrite() to receive data from host */
+				return USB_NO_MSG; 
 			 }
-			 else if (reportId >= 4 && reportId <= 9) { // Serial data for LEDs
+			 else if(reportId == 4){ // Mode
+				currentAddress = 0;
+				bytesRemaining = 1;
+
+				addressOffset = 0;
+				return USB_NO_MSG; 
+			 }
+			 else if(reportId == 5){ // Indexed LED data
+				currentAddress = 0;
+				bytesRemaining = 5;
+
+				addressOffset = 0;
+				return USB_NO_MSG; 
+			 }
+			 else if (reportId >= 6 && reportId <= 11) { // Serial data for LEDs
 				 currentAddress = 0;
 				 addressOffset = 0;
 
 				 switch (reportId) {
-					case 4:
+					case 6:
 					    bytesRemaining = MIN_LED_FRAME * 1 + 1;
 					    break;
-					case 5:
+					case 7:
 					    bytesRemaining = MIN_LED_FRAME * 2 + 1;
 					    break;
-					case 6:
+					case 8:
 					    bytesRemaining = MIN_LED_FRAME * 4 + 1;
 					    break;
-					case 7:
-					    bytesRemaining = MIN_LED_FRAME * 8 + 1;
-					    break;
-					case 8:
-					    bytesRemaining = MIN_LED_FRAME * 8 + 1;
-					    break;
 					case 9:
+					    bytesRemaining = MIN_LED_FRAME * 8 + 1;
+					    break;
+					case 10:
+					    bytesRemaining = MIN_LED_FRAME * 8 + 1;
+					    break;
+					case 11:
 					    bytesRemaining = MIN_LED_FRAME * 8 + 1;
 						addressOffset = 64 * 3;
 					    break;
@@ -501,10 +544,10 @@ int main(void)
 	//PB0 - B
 	
 	led[0]=32; led[1]=32; led[2]=32;
-	ws2812_sendarray_mask(&led[0], 3, _BV(PB4));
+	ws2812_sendarray_mask(&led[0], 3, channelToPin(0));
     _delay_ms(10);
 	led[0]=0; led[1]=0; led[2]=0;
-	ws2812_sendarray_mask(&led[0], 3, _BV(PB4));
+	ws2812_sendarray_mask(&led[0], 3, channelToPin(0));
 
     sei();
 
