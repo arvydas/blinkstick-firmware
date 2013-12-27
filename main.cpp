@@ -192,6 +192,13 @@ uchar channelToPin(uchar ch) {
 	}
 }
 
+void setRGBPWM(uint8_t r, uint8_t g, uint8_t b)
+{
+	R_PWM = r;   
+	G_PWM = g;   
+	B_PWM = b;   
+}
+
 void ApplyMode(void)
 {
 	if (mode == MODE_RGB || mode == MODE_RGB_INVERSE)
@@ -204,30 +211,30 @@ void ApplyMode(void)
 		TCCR1 |= _BV (CS10);
 		TCCR0B |=  _BV(CS00);
 
-		/* Set PWM value to 0. */
+		/* Set PWM value to off after a brief 10ms blink. */
 		if (mode == MODE_RGB)
 		{
-			R_PWM = 255;   
-			G_PWM = 255;   
-			B_PWM = 255;   
+			setRGBPWM(32, 32, 32);
+			_delay_ms(10);
+			setRGBPWM(255, 255, 255);
 		}
 		else
 		{
-			R_PWM = 0;   
-			G_PWM = 0;   
-			B_PWM = 0;   
+			setRGBPWM(223, 223, 223);
+			_delay_ms(10);
+			setRGBPWM(0, 0, 0);
 		}
 	}
 	else if (mode == MODE_WS2812)
 	{
-		R_PWM = 0;   
-		G_PWM = 0;   
-		B_PWM = 0;   
+		//Turn off PWM
+		setRGBPWM(0, 0, 0);
 
 		/* Stop timer 0 and 1 */
 		TCCR1 &= ~_BV (CS10);
 		TCCR0B &=  ~_BV(CS00);
 
+		/* Disable PWM */
 		GTCCR &= ~_BV(PWM1B) & ~_BV(COM1B1);
 		TCCR0A &= ~_BV(WGM00) & ~_BV(WGM01) & ~_BV(COM0A1) & ~_BV(COM0B1);
 
@@ -235,7 +242,9 @@ void ApplyMode(void)
 		ws2812_sendarray_mask(&led[0], 3, channelToPin(0));
 		ws2812_sendarray_mask(&led[0], 3, channelToPin(1));
 		ws2812_sendarray_mask(&led[0], 3, channelToPin(2));
+
 		_delay_ms(10);
+
 		led[0]=0; led[1]=0; led[2]=0;
 		ws2812_sendarray_mask(&led[0], 3, channelToPin(0));
 		ws2812_sendarray_mask(&led[0], 3, channelToPin(1));
