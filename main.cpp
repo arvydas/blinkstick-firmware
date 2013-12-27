@@ -268,9 +268,7 @@ uchar usbFunctionWrite(uchar *data, uchar len)
 			led[2] = data[3];
 
 			//Set PWM values
-			R_PWM = 255 - led[1];
-			G_PWM = 255 - led[0];
-			B_PWM = 255 - led[2];
+			setRGBPWM(255 - led[1], 255 - led[0], 255 - led[2]);
 		}
 		else if (mode == MODE_RGB_INVERSE)
 		{
@@ -279,9 +277,7 @@ uchar usbFunctionWrite(uchar *data, uchar len)
 			led[2] = data[3];
 
 			//Set PWM values
-			R_PWM = led[1];
-			G_PWM = led[0];
-			B_PWM = led[2];
+			setRGBPWM(led[1], led[0], led[2]);
 		}
 		else if (mode == MODE_WS2812)
 		{
@@ -332,6 +328,11 @@ uchar usbFunctionWrite(uchar *data, uchar len)
 	}
 	else if (reportId == 5)
 	{
+		if (mode != MODE_WS2812)
+		{
+			return 1;
+		}
+
 		channel = data[1];
 		uint8_t index = data[2];
 
@@ -339,14 +340,21 @@ uchar usbFunctionWrite(uchar *data, uchar len)
 		led[index * 3 + 1] = data[3];
 		led[index * 3 + 2] = data[5];
 
-		cli(); //Disable interrupts
-		ws2812_sendarray_mask(&led[0], (index + 1) * 3, channelToPin(channel));
-		sei(); //Enable interrupts
+		if (mode == MODE_WS2812)
+		{
+			cli(); //Disable interrupts
+			ws2812_sendarray_mask(&led[0], (index + 1) * 3, channelToPin(channel));
+			sei(); //Enable interrupts
+		}
 
 		return 1;
 	}
 	else if (reportId >= 6 && reportId <= 11) // Serial data for LEDs
 	{
+		if (mode != MODE_WS2812)
+		{
+			return 1;
+		}
 
 		if (bytesRemaining == 0)
 		{
@@ -387,15 +395,11 @@ uchar usbFunctionWrite(uchar *data, uchar len)
 			bytesRemaining -= len;
 		}
 
-
-		if (bytesRemaining <= 0)
+		if (bytesRemaining <= 0 && reportId != 10)
 		{
-			if (reportId != 10)
-			{
-				cli(); //Disable interrupts
-				ws2812_sendarray_mask(&led[0], MAX_LEDS * 3, channelToPin(channel));
-				sei(); //Enable interrupts
-			}
+			cli(); //Disable interrupts
+			ws2812_sendarray_mask(&led[0], MAX_LEDS * 3, channelToPin(channel));
+			sei(); //Enable interrupts
 		}
 
 		return bytesRemaining == 0; // return 1 if this was the last chunk 
