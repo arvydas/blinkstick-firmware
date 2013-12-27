@@ -233,9 +233,13 @@ void ApplyMode(void)
 
 		led[0]=32; led[1]=32; led[2]=32;
 		ws2812_sendarray_mask(&led[0], 3, channelToPin(0));
+		ws2812_sendarray_mask(&led[0], 3, channelToPin(1));
+		ws2812_sendarray_mask(&led[0], 3, channelToPin(2));
 		_delay_ms(10);
 		led[0]=0; led[1]=0; led[2]=0;
 		ws2812_sendarray_mask(&led[0], 3, channelToPin(0));
+		ws2812_sendarray_mask(&led[0], 3, channelToPin(1));
+		ws2812_sendarray_mask(&led[0], 3, channelToPin(2));
 	}
 }
 
@@ -310,7 +314,9 @@ uchar usbFunctionWrite(uchar *data, uchar len)
 	{
 		mode = data[1];
 		eeprom_write_byte((uchar *)0 + 1 + 12, mode);
+		cli(); //Disable interrupts
 		ApplyMode();
+		sei(); //Enable interrupts
 		return 1;
 	}
 	else if (reportId == 5)
