@@ -192,6 +192,53 @@ uchar channelToPin(uchar ch) {
 	}
 }
 
+void ApplyMode(void)
+{
+	if (mode == MODE_RGB || mode == MODE_RGB_INVERSE)
+	{
+		/* PWM enable,  */
+		GTCCR |= _BV(PWM1B) | _BV(COM1B1);
+		TCCR0A |= _BV(WGM00) | _BV(WGM01) | _BV(COM0A1) | _BV(COM0B1);
+
+		/* Start timer 0 and 1 */
+		TCCR1 |= _BV (CS10);
+		TCCR0B |=  _BV(CS00);
+
+		/* Set PWM value to 0. */
+		if (mode == MODE_RGB)
+		{
+			R_PWM = 255;   
+			G_PWM = 255;   
+			B_PWM = 255;   
+		}
+		else
+		{
+			R_PWM = 0;   
+			G_PWM = 0;   
+			B_PWM = 0;   
+		}
+	}
+	else if (mode == MODE_WS2812)
+	{
+		R_PWM = 0;   
+		G_PWM = 0;   
+		B_PWM = 0;   
+
+		/* Stop timer 0 and 1 */
+		TCCR1 &= ~_BV (CS10);
+		TCCR0B &=  ~_BV(CS00);
+
+		GTCCR &= ~_BV(PWM1B) & ~_BV(COM1B1);
+		TCCR0A &= ~_BV(WGM00) & ~_BV(WGM01) & ~_BV(COM0A1) & ~_BV(COM0B1);
+
+		led[0]=32; led[1]=32; led[2]=32;
+		ws2812_sendarray_mask(&led[0], 3, channelToPin(0));
+		_delay_ms(10);
+		led[0]=0; led[1]=0; led[2]=0;
+		ws2812_sendarray_mask(&led[0], 3, channelToPin(0));
+	}
+}
+
 /* usbFunctionWrite() is called when the host sends a chunk of data to the
 * device. 
 */
@@ -263,6 +310,7 @@ uchar usbFunctionWrite(uchar *data, uchar len)
 	{
 		mode = data[1];
 		eeprom_write_byte((uchar *)0 + 1 + 12, mode);
+		ApplyMode();
 		return 1;
 	}
 	else if (reportId == 5)
@@ -523,44 +571,6 @@ extern "C" void usbEventResetReady(void)
     eeprom_write_byte(0, OSCCAL);   // store the calibrated value in EEPROM
 }
 
-/* ------------------------------------------------------------------------- */
-void ApplyMode(void)
-{
-	if (mode == MODE_RGB || mode == MODE_RGB_INVERSE)
-	{
-		/* PWM enable,  */
-		GTCCR |= _BV(PWM1B) | _BV(COM1B1);
-
-		TCCR0A |= _BV(WGM00) | _BV(WGM01) | _BV(COM0A1) | _BV(COM0B1);
-
-		/* Start timer 0 and 1 */
-		TCCR1 |= _BV (CS10);
-
-		TCCR0B |=  _BV(CS00);
-
-		/* Set PWM value to 0. */
-		if (mode == MODE_RGB)
-		{
-			R_PWM = 255;   
-			G_PWM = 255;   
-			B_PWM = 255;   
-		}
-		else
-		{
-			R_PWM = 0;   
-			G_PWM = 0;   
-			B_PWM = 0;   
-		}
-	}
-	else if (mode == MODE_WS2812)
-	{
-		led[0]=32; led[1]=32; led[2]=32;
-		ws2812_sendarray_mask(&led[0], 3, channelToPin(0));
-		_delay_ms(10);
-		led[0]=0; led[1]=0; led[2]=0;
-		ws2812_sendarray_mask(&led[0], 3, channelToPin(0));
-	}
-}
 
 int main(void)
 {
