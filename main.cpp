@@ -61,8 +61,10 @@ extern "C"
 		00      : Oscillator calibration value
 		01 - 0C : Serial
 		0D      : Mode
+		0F - 1F : <unused>
 		20 - 3F : Name
 		40 - 5F : Data
+		60 -    : <unused>
 */
 
 const PROGMEM char usbHidReportDescriptor[USB_CFG_HID_REPORT_DESCRIPTOR_LENGTH] = {    /* USB report descriptor */
