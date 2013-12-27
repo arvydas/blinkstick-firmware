@@ -8,11 +8,18 @@
  */
 
 #define LED_PORT_DDR        DDRB
-#define LED_PORT_OUTPUT     PORTB
-#define R_BIT            1
-#define G_BIT            0
-#define B_BIT            4
 
+#define R_BIT               PB4
+#define G_BIT               PB1
+#define B_BIT               PB0
+
+#define R_PWM				OCR1B
+#define G_PWM				OCR0B
+#define B_PWM				OCR0A
+
+#define MODE_RGB			0
+#define MODE_RGB_INVERSE   	1
+#define MODE_WS2812		   	2
 
 #include <avr/io.h>
 #include <avr/wdt.h>
@@ -41,7 +48,7 @@ extern "C"
 		1: LED Data [R, G, B]
 		2: Name [Binary Data 0..32]
 		3: Data [Binary Data 0..32]
-		4: Mode set [MODE]: 0 - RGB LED Strip, 1 - WS2812
+		4: Mode set [MODE]: 0 - RGB LED Strip, 1 - Inverse RGB LED Strip, 2 - WS2812
 		5: LED Data [CHANNEL, INDEX, R, G, B]
 		6: LED Frame [Channel, [G, R, B][0..7]]
 		7: LED Frame [Channel, [G, R, B][0..15]]
@@ -49,6 +56,13 @@ extern "C"
 		9: LED Frame [Channel, [G, R, B][0..63]]
 		A: LED Frame [Channel, [G, R, B][0..63]]
 		B: LED Frame [Channel, [G, R, B][64..127]] - sends changes
+	
+	Memory Map:
+		00      : Oscillator calibration value
+		01 - 0C : Serial
+		0D      : Mode
+		20 - 3F : Name
+		40 - 5F : Data
 */
 
 const PROGMEM char usbHidReportDescriptor[USB_CFG_HID_REPORT_DESCRIPTOR_LENGTH] = {    /* USB report descriptor */
@@ -110,9 +124,8 @@ static uchar currentAddress;
 static uchar addressOffset;
 static uchar bytesRemaining;
 static uchar reportId = 0; 
-static int channel;
-
-//static uchar ledColorBuffer[4]; //3 for data + 1 for report id
+static uchar channel;
+static uint8_t mode;
 
 static uint8_t led[MAX_LEDS * 3];
 
@@ -151,6 +164,12 @@ uchar usbFunctionRead(uchar *data, uchar len)
 
 		return len;
 	}
+	else if (reportId == 4)
+	{
+		data[0] = 4;
+		data[1] = mode;
+		return 2;
+	}
 	else
 	{
 		return 0;
@@ -161,15 +180,15 @@ uchar usbFunctionRead(uchar *data, uchar len)
 uchar channelToPin(uchar ch) {
 	if (ch == 1) //G
 	{
-		return _BV(PB1);
+		return _BV(G_BIT);
 	}
 	else if (ch == 2) //B
 	{
-		return _BV(PB0);
+		return _BV(B_BIT);
 	}
 	else 
 	{
-		return _BV(PB4); //R
+		return _BV(R_BIT); //R
 	}
 }
 
@@ -180,14 +199,39 @@ uchar usbFunctionWrite(uchar *data, uchar len)
 {
 	if (reportId == 1)
 	{
-		led[0] = data[2];
-		led[1] = data[1];
-		led[2] = data[3];
+		if (mode == MODE_RGB)
+		{
+			led[0] = data[2];
+			led[1] = data[1];
+			led[2] = data[3];
 
-		//Set only the first LED on the first channel
-		cli(); //Disable interrupts
-		ws2812_sendarray_mask(&led[0], 3, channelToPin(0));
-		sei(); //Enable interrupts
+			//Set PWM values
+			R_PWM = 255 - led[1];
+			G_PWM = 255 - led[0];
+			B_PWM = 255 - led[2];
+		}
+		else if (mode == MODE_RGB_INVERSE)
+		{
+			led[0] = data[2];
+			led[1] = data[1];
+			led[2] = data[3];
+
+			//Set PWM values
+			R_PWM = led[1];
+			G_PWM = led[0];
+			B_PWM = led[2];
+		}
+		else if (mode == MODE_WS2812)
+		{
+			led[0] = data[2];
+			led[1] = data[1];
+			led[2] = data[3];
+
+			//Set only the first LED on the first channel
+			cli(); //Disable interrupts
+			ws2812_sendarray_mask(&led[0], 3, channelToPin(0));
+			sei(); //Enable interrupts
+		}
 
 		return 1;
 	}
@@ -214,6 +258,12 @@ uchar usbFunctionWrite(uchar *data, uchar len)
 		}
 
 		return bytesRemaining == 0; // return 1 if this was the last chunk 
+	}
+	else if (reportId == 4)
+	{
+		mode = data[1];
+		eeprom_write_byte((uchar *)0 + 1 + 12, mode);
+		return 1;
 	}
 	else if (reportId == 5)
 	{
@@ -322,6 +372,14 @@ static void SetSerial(void)
    }
 }
 
+/* Retrieves the current mode from EEPROM */
+static void SetMode(void)
+{
+   mode = eeprom_read_byte((uchar *)0 + 1 + 12);
+
+   if (mode > 2)
+	   mode = 0;
+}
 
 
 /* ------------------------------------------------------------------------- */
@@ -331,27 +389,6 @@ extern "C" usbMsgLen_t usbFunctionSetup(uchar data[8])
 	usbRequest_t    *rq = (usbRequest_t *)data;
 	reportId = rq->wValue.bytes[0];
 
-	/* this code is no longer needed
-    if((rq->bmRequestType & USBRQ_TYPE_MASK) == USBRQ_TYPE_VENDOR)
-	{
-		switch(rq->bRequest)
-		{
-		case CUSTOM_RQ_SET_RED:
-			r = 255 - rq->wValue.bytes[0];
-			OCR0B = r;
-			break;	
-		case CUSTOM_RQ_SET_GREEN:
-			g = 255 - rq->wValue.bytes[0];
-			OCR0A = g;
-			break;	
-		case CUSTOM_RQ_SET_BLUE:
-			b = 255 - rq->wValue.bytes[0];
-			OCR1B = b;
-			break;	
-		}
-    }
-	else 
-	*/
 	if((rq->bmRequestType & USBRQ_TYPE_MASK) == USBRQ_TYPE_CLASS){ /* HID class request */
         if(rq->bRequest == USBRQ_HID_GET_REPORT){ /* wValue: ReportType (highbyte), ReportID (lowbyte) */
 			 if(reportId == 1){ //Device colors
@@ -487,24 +524,43 @@ extern "C" void usbEventResetReady(void)
 }
 
 /* ------------------------------------------------------------------------- */
-void pwmInit (void)
+void ApplyMode(void)
 {
-    /* PWM enable,  */
-    GTCCR |= _BV(PWM1B) | _BV(COM1B1);
+	if (mode == MODE_RGB || mode == MODE_RGB_INVERSE)
+	{
+		/* PWM enable,  */
+		GTCCR |= _BV(PWM1B) | _BV(COM1B1);
 
-    TCCR0A |= _BV(WGM00) | _BV(WGM01) | _BV(COM0A1) | _BV(COM0B1);
+		TCCR0A |= _BV(WGM00) | _BV(WGM01) | _BV(COM0A1) | _BV(COM0B1);
 
+		/* Start timer 0 and 1 */
+		TCCR1 |= _BV (CS10);
 
-    /* Start timer 0 and 1 */
-    TCCR1 |= _BV (CS10);
+		TCCR0B |=  _BV(CS00);
 
-    TCCR0B |=  _BV(CS00);
-
-    /* Set PWM value to 0. */
-    OCR0A = 255;   // PB0
-    OCR0B = 255;   // PB1
-    OCR1B = 255;   // PB4
-} 
+		/* Set PWM value to 0. */
+		if (mode == MODE_RGB)
+		{
+			R_PWM = 255;   
+			G_PWM = 255;   
+			B_PWM = 255;   
+		}
+		else
+		{
+			R_PWM = 0;   
+			G_PWM = 0;   
+			B_PWM = 0;   
+		}
+	}
+	else if (mode == MODE_WS2812)
+	{
+		led[0]=32; led[1]=32; led[2]=32;
+		ws2812_sendarray_mask(&led[0], 3, channelToPin(0));
+		_delay_ms(10);
+		led[0]=0; led[1]=0; led[2]=0;
+		ws2812_sendarray_mask(&led[0], 3, channelToPin(0));
+	}
+}
 
 int main(void)
 {
@@ -513,6 +569,8 @@ int main(void)
     wdt_enable(WDTO_1S);
 
 	SetSerial();
+	SetMode();
+
     /* Even if you don't use the watchdog, turn it off here. On newer devices,
      * the status of the watchdog (on/off, period) is PRESERVED OVER RESET!
      */
@@ -530,24 +588,12 @@ int main(void)
     }
     usbDeviceConnect();
 	
-	DDRB |= _BV(PB4);
-	DDRB |= _BV(PB1);
-	DDRB |= _BV(PB0);
-	
-    //LED_PORT_DDR |= _BV(R_BIT);   /* make the LED bit an output */
-    //LED_PORT_DDR |= _BV(G_BIT);   /* make the LED bit an output */
-    //LED_PORT_DDR |= _BV(B_BIT);   /* make the LED bit an output */
-	//pwmInit();
+	//Set LED ports to output
+    LED_PORT_DDR |= _BV(R_BIT);   
+    LED_PORT_DDR |= _BV(G_BIT);   
+    LED_PORT_DDR |= _BV(B_BIT);   
 
-	//PB4 - R
-	//PB1 - G
-	//PB0 - B
-	
-	led[0]=32; led[1]=32; led[2]=32;
-	ws2812_sendarray_mask(&led[0], 3, channelToPin(0));
-    _delay_ms(10);
-	led[0]=0; led[1]=0; led[2]=0;
-	ws2812_sendarray_mask(&led[0], 3, channelToPin(0));
+	ApplyMode();
 
     sei();
 
