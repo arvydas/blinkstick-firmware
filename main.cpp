@@ -21,6 +21,10 @@
 #define MODE_RGB_INVERSE   	1
 #define MODE_WS2812		   	2
 
+#define TASK_NONE			0
+#define TASK_SEND_DATA 		1
+#define TASK_SET_MODE  		2
+
 #include <avr/io.h>
 //#include <avr/wdt.h>
 #include <avr/eeprom.h>
@@ -328,9 +332,12 @@ uchar usbFunctionWrite(uchar *data, uchar len)
 	{
 		mode = data[1];
 		eeprom_write_byte((uchar *)0 + 1 + 12, mode);
-		cli(); //Disable interrupts
-		ApplyMode();
-		sei(); //Enable interrupts
+		//Prepare to send the data simultaneously together with USB polling
+		task = TASK_SET_MODE;
+		delayCycles = 0;
+		
+		//Disable any USB requests while sending data to LED Strip
+		usbDisableAllRequests();
 		return 1;
 	}
 	else if (reportId == 5)
@@ -348,7 +355,7 @@ uchar usbFunctionWrite(uchar *data, uchar len)
 		led[index * 3 + 2] = data[5];
 
 		//Prepare to send the data simultaneously together with USB polling
-		task = 1;
+		task = TASK_SEND_DATA;
 		ledCount = (index + 1) * 3;
 		ledIndex = 0;
 		delayCycles = 0;
@@ -385,7 +392,7 @@ uchar usbFunctionWrite(uchar *data, uchar len)
 				*/
 
 				//Prepare to send the data simultaneously together with USB polling
-				task = 1;
+				task = TASK_SEND_DATA;
 				ledCount = MAX_LEDS * 3;
 				ledIndex = 0;
 				delayCycles = 0;
@@ -433,7 +440,7 @@ uchar usbFunctionWrite(uchar *data, uchar len)
 			*/
 
 			//Prepare to send the data simultaneously together with USB polling
-			task = 1;
+			task = TASK_SEND_DATA;
 			ledCount = MAX_LEDS * 3;
 			ledIndex = 0;
 			delayCycles = 0;
@@ -633,11 +640,18 @@ extern "C" void usbEventResetReady(void)
 }
 
 void ledPoll() {
-	if (task == 1)
+
+	if (task != TASK_NONE)
 	{
-		if (delayCycles >= DELAY_CYCLES)
+		if (delayCycles < DELAY_CYCLES)
 		{
-			//send 12 bytes at the same time
+			delayCycles++;
+			return;
+		}
+
+		if (task == TASK_SEND_DATA)
+		{
+			//send all data at the same time, asume there is going to be no communication over USB during this time
 			uint16_t len = 3 * 64;
 
 			if (ledIndex + len >= ledCount)
@@ -653,15 +667,21 @@ void ledPoll() {
 
 			if (ledIndex >= ledCount - 1)
 			{
-				task = 0;
+				task = TASK_NONE;
 				usbEnableAllRequests();
 			}
 		}
-		else
+		else if (task == TASK_SET_MODE)
 		{
-			delayCycles++;
+			cli(); //Disable interrupts
+			ApplyMode();
+			sei(); //Enable interrupts
+
+			task = TASK_NONE;
+			usbEnableAllRequests();
 		}
 	}
+
 }
 
 
