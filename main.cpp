@@ -22,7 +22,7 @@
 #define MODE_WS2812		   	2
 
 #include <avr/io.h>
-#include <avr/wdt.h>
+//#include <avr/wdt.h>
 #include <avr/eeprom.h>
 #include <avr/interrupt.h>  /* for sei() */
 #include <util/delay.h>     /* for _delay_ms() */
@@ -40,8 +40,9 @@ extern "C"
 
 //if descriptor changes, USB_CFG_HID_REPORT_DESCRIPTOR_LENGTH also has to be updated in usbconfig.h
 
-#define MAX_LEDS		128
+#define MAX_LEDS		64
 #define MIN_LED_FRAME	8 * 3
+#define DELAY_CYCLES	2048
 
 /* 
 	Reports:
@@ -54,8 +55,8 @@ extern "C"
 		7: LED Frame [Channel, [G, R, B][0..15]]
 		8: LED Frame [Channel, [G, R, B][0..31]]
 		9: LED Frame [Channel, [G, R, B][0..63]]
-		A: LED Frame [Channel, [G, R, B][0..63]]
-		B: LED Frame [Channel, [G, R, B][64..127]] - sends changes
+		--- A: LED Frame [Channel, [G, R, B][0..63]]
+		--- B: LED Frame [Channel, [G, R, B][64..127]] - sends changes
 	
 	Memory Map:
 		00      : Oscillator calibration value
@@ -111,6 +112,7 @@ const PROGMEM char usbHidReportDescriptor[USB_CFG_HID_REPORT_DESCRIPTOR_LENGTH] 
     0x95, MIN_LED_FRAME * 8 + 1,   //   REPORT_COUNT (193)
     0x09, 0x00,                    //   USAGE (Undefined)
     0xb2, 0x02, 0x01,              //   FEATURE (Data,Var,Abs,Buf)
+/*
     0x85, 0x0A,                    //   REPORT_ID (10)
     0x95, MIN_LED_FRAME * 8 + 1,   //   REPORT_COUNT (193)
     0x09, 0x00,                    //   USAGE (Undefined)
@@ -119,6 +121,7 @@ const PROGMEM char usbHidReportDescriptor[USB_CFG_HID_REPORT_DESCRIPTOR_LENGTH] 
     0x95, MIN_LED_FRAME * 8 + 1,   //   REPORT_COUNT (193)
     0x09, 0x00,                    //   USAGE (Undefined)
     0xb2, 0x02, 0x01,              //   FEATURE (Data,Var,Abs,Buf)
+*/
     0xc0                           // END_COLLECTION
 };
 
@@ -128,6 +131,10 @@ static uchar bytesRemaining;
 static uchar reportId = 0; 
 static uchar channel;
 static uint8_t mode;
+static uint8_t task = 0;
+static uint16_t ledCount = 0;
+static uint16_t ledIndex = 0;
+static uint16_t delayCycles = 0;
 
 static uint8_t led[MAX_LEDS * 3];
 
@@ -340,12 +347,23 @@ uchar usbFunctionWrite(uchar *data, uchar len)
 		led[index * 3 + 1] = data[3];
 		led[index * 3 + 2] = data[5];
 
+		//Prepare to send the data simultaneously together with USB polling
+		task = 1;
+		ledCount = (index + 1) * 3;
+		ledIndex = 0;
+		delayCycles = 0;
+		
+		//Disable any USB requests while sending data to LED Strip
+		usbDisableAllRequests();
+
+		/*
 		if (mode == MODE_WS2812)
 		{
 			cli(); //Disable interrupts
 			ws2812_sendarray_mask(&led[0], (index + 1) * 3, channelToPin(channel));
 			sei(); //Enable interrupts
 		}
+		*/
 
 		return 1;
 	}
@@ -592,12 +610,44 @@ extern "C" void usbEventResetReady(void)
     eeprom_write_byte(0, OSCCAL);   // store the calibrated value in EEPROM
 }
 
+void ledPoll() {
+	if (task == 1)
+	{
+		if (delayCycles >= DELAY_CYCLES)
+		{
+			//send 12 bytes at the same time
+			uint16_t len = 3 * 64;
+
+			if (ledIndex + len >= ledCount)
+			{
+				len = ledCount - ledIndex;
+			}
+
+			cli(); //Disable interrupts
+			ws2812_sendarray_mask(&led[ledIndex], len, channelToPin(channel));
+			sei(); //Enable interrupts
+
+			ledIndex += len;
+
+			if (ledIndex >= ledCount - 1)
+			{
+				task = 0;
+				usbEnableAllRequests();
+			}
+		}
+		else
+		{
+			delayCycles++;
+		}
+	}
+}
+
 
 int main(void)
 {
 	uchar   i;
 
-    wdt_enable(WDTO_1S);
+    //wdt_enable(WDTO_1S);
 
 	SetSerial();
 	SetMode();
@@ -614,7 +664,7 @@ int main(void)
     usbDeviceDisconnect();  /* enforce re-enumeration, do this while interrupts are disabled! */
     i = 0;
     while(--i){             /* fake USB disconnect for > 250 ms */
-        wdt_reset();
+        //wdt_reset();
         _delay_ms(1);
     }
     usbDeviceConnect();
@@ -629,8 +679,11 @@ int main(void)
     sei();
 
     for(;;){                /* main event loop */
-        wdt_reset();
-        usbPoll();
+        //wdt_reset();
+
+	  	usbPoll();
+
+		ledPoll();	
     }
     return 0;
 }
