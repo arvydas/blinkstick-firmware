@@ -378,9 +378,20 @@ uchar usbFunctionWrite(uchar *data, uchar len)
 		{
 			if (reportId != 10)
 			{
+				/* !!!!
 				cli(); //Disable interrupts
 				ws2812_sendarray_mask(&led[0], MAX_LEDS * 3, channelToPin(channel));
 				sei(); //Enable interrupts
+				*/
+
+				//Prepare to send the data simultaneously together with USB polling
+				task = 1;
+				ledCount = MAX_LEDS * 3;
+				ledIndex = 0;
+				delayCycles = 0;
+				
+				//Disable any USB requests while sending data to LED Strip
+				usbDisableAllRequests();
 			}
 
 			return 1; // end of transfer 
@@ -415,9 +426,20 @@ uchar usbFunctionWrite(uchar *data, uchar len)
 
 		if (bytesRemaining <= 0 && reportId != 10)
 		{
+			/* !!!!
 			cli(); //Disable interrupts
 			ws2812_sendarray_mask(&led[0], MAX_LEDS * 3, channelToPin(channel));
 			sei(); //Enable interrupts
+			*/
+
+			//Prepare to send the data simultaneously together with USB polling
+			task = 1;
+			ledCount = MAX_LEDS * 3;
+			ledIndex = 0;
+			delayCycles = 0;
+			
+			//Disable any USB requests while sending data to LED Strip
+			usbDisableAllRequests();
 		}
 
 		return bytesRemaining == 0; // return 1 if this was the last chunk 
