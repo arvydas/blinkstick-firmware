@@ -42,7 +42,7 @@ extern "C"
 
 #define MAX_LEDS		64
 #define MIN_LED_FRAME	8 * 3
-#define DELAY_CYCLES	2048
+#define DELAY_CYCLES	64
 
 /* 
 	Reports:
