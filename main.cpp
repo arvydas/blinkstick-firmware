@@ -198,13 +198,6 @@ uchar usbFunctionRead(uchar *data, uchar len)
     }
     else if (reportId >= 6 && reportId <= 11) // Serial data for LEDs
     {
-       /*
-       if (mode != MODE_WS2812)
-       {
-               return 1;
-       }
-       */
-
        if (bytesRemaining == 0)
        {
 		   return 0; // end of transfer 
@@ -421,15 +414,6 @@ uchar usbFunctionWrite(uchar *data, uchar len)
 		//Disable any USB requests while sending data to LED Strip
 		usbDisableAllRequests();
 
-		/*
-		if (mode == MODE_WS2812)
-		{
-			cli(); //Disable interrupts
-			ws2812_sendarray_mask(&led[0], (index + 1) * 3, channelToPin(channel));
-			sei(); //Enable interrupts
-		}
-		*/
-
 		return 1;
 	}
 	else if (reportId >= 6 && reportId <= 11) // Serial data for LEDs
@@ -443,12 +427,6 @@ uchar usbFunctionWrite(uchar *data, uchar len)
 		{
 			if (reportId != 10)
 			{
-				/* !!!!
-				cli(); //Disable interrupts
-				ws2812_sendarray_mask(&led[0], MAX_LEDS * 3, channelToPin(channel));
-				sei(); //Enable interrupts
-				*/
-
 				//Prepare to send the data simultaneously together with USB polling
 				task = TASK_SEND_DATA;
 				ledCount = pgm_read_word_near(&ledDataCount[reportId - 6]);
@@ -491,12 +469,6 @@ uchar usbFunctionWrite(uchar *data, uchar len)
 
 		if (bytesRemaining <= 0 && reportId != 10)
 		{
-			/* !!!!
-			cli(); //Disable interrupts
-			ws2812_sendarray_mask(&led[0], MAX_LEDS * 3, channelToPin(channel));
-			sei(); //Enable interrupts
-			*/
-
 			//Prepare to send the data simultaneously together with USB polling
 			task = TASK_SEND_DATA;
 			ledCount = pgm_read_word_near(&ledDataCount[reportId - 6]);
