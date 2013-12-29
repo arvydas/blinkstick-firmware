@@ -528,6 +528,9 @@ extern "C" usbMsgLen_t usbFunctionSetup(uchar data[8])
 
 				 return USB_NO_MSG; 
 			 }
+			 else if(reportId == 4){ // Report device mode
+				 return USB_NO_MSG; 
+			 }
 
 			 return 0;
 
