@@ -38,14 +38,16 @@ extern "C"
 }
 
 /* ------------------------------------------------------------------------- */
-/* ----------------------------- USB interface ----------------------------- */
+/* ----------------------------- LED interface ----------------------------- */
 /* ------------------------------------------------------------------------- */
-
-//if descriptor changes, USB_CFG_HID_REPORT_DESCRIPTOR_LENGTH also has to be updated in usbconfig.h
 
 #define MAX_LEDS		64
 #define MIN_LED_FRAME	8 * 3
 #define DELAY_CYCLES	64
+
+static uint8_t led[MAX_LEDS * 3];
+
+const PROGMEM uint16_t ledDataCount[] = {MIN_LED_FRAME, MIN_LED_FRAME * 2, MIN_LED_FRAME * 4, MIN_LED_FRAME * 8 };
 
 /* 
 	Reports:
@@ -58,8 +60,6 @@ extern "C"
 		7: LED Frame [Channel, [G, R, B][0..15]]
 		8: LED Frame [Channel, [G, R, B][0..31]]
 		9: LED Frame [Channel, [G, R, B][0..63]]
-		--- A: LED Frame [Channel, [G, R, B][0..63]]
-		--- B: LED Frame [Channel, [G, R, B][64..127]] - sends changes
 	
 	Memory Map:
 		00      : Oscillator calibration value
@@ -70,6 +70,12 @@ extern "C"
 		40 - 5F : Data
 		60 -    : <unused>
 */
+
+/* ------------------------------------------------------------------------- */
+/* ----------------------------- USB interface ----------------------------- */
+/* ------------------------------------------------------------------------- */
+
+//if descriptor changes, USB_CFG_HID_REPORT_DESCRIPTOR_LENGTH also has to be updated in usbconfig.h
 
 const PROGMEM char usbHidReportDescriptor[USB_CFG_HID_REPORT_DESCRIPTOR_LENGTH] = {    /* USB report descriptor */
 
@@ -118,20 +124,17 @@ const PROGMEM char usbHidReportDescriptor[USB_CFG_HID_REPORT_DESCRIPTOR_LENGTH] 
     0xc0                           // END_COLLECTION
 };
 
-const PROGMEM uint16_t ledDataCount[] = {MIN_LED_FRAME, MIN_LED_FRAME * 2, MIN_LED_FRAME * 4, MIN_LED_FRAME * 8 };
-
 static uchar currentAddress;
 static uchar addressOffset;
 static uchar bytesRemaining;
 static uchar reportId = 0; 
 static uchar channel;
+
 static uint8_t mode;
 static uint8_t task = 0;
 static uint16_t ledCount = 0;
 static uint16_t ledIndex = 0;
 static uint16_t delayCycles = 0;
-
-static uint8_t led[MAX_LEDS * 3];
 
 /* usbFunctionRead() is called when the host requests a chunk of data from
 * the device. 
@@ -250,59 +253,6 @@ void setRGBPWM(uint8_t r, uint8_t g, uint8_t b)
 	R_PWM = r;   
 	G_PWM = g;   
 	B_PWM = b;   
-}
-
-void ApplyMode(void)
-{
-	if (mode == MODE_RGB || mode == MODE_RGB_INVERSE)
-	{
-		/* PWM enable,  */
-		GTCCR |= _BV(PWM1B) | _BV(COM1B1);
-		TCCR0A |= _BV(WGM00) | _BV(WGM01) | _BV(COM0A1) | _BV(COM0B1);
-
-		/* Start timer 0 and 1 */
-		TCCR1 |= _BV (CS10);
-		TCCR0B |=  _BV(CS00);
-
-		/* Set PWM value to off after a brief 10ms blink. */
-		if (mode == MODE_RGB)
-		{
-			setRGBPWM(32, 32, 32);
-			_delay_ms(10);
-			setRGBPWM(255, 255, 255);
-		}
-		else
-		{
-			setRGBPWM(223, 223, 223);
-			_delay_ms(10);
-			setRGBPWM(0, 0, 0);
-		}
-	}
-	else if (mode == MODE_WS2812)
-	{
-		//Turn off PWM
-		setRGBPWM(0, 0, 0);
-
-		/* Stop timer 0 and 1 */
-		TCCR1 &= ~_BV (CS10);
-		TCCR0B &=  ~_BV(CS00);
-
-		/* Disable PWM */
-		GTCCR &= ~_BV(PWM1B) & ~_BV(COM1B1);
-		TCCR0A &= ~_BV(WGM00) & ~_BV(WGM01) & ~_BV(COM0A1) & ~_BV(COM0B1);
-
-		led[0]=32; led[1]=32; led[2]=32;
-		ws2812_sendarray_mask(&led[0], 3, channelToPin(0));
-		ws2812_sendarray_mask(&led[0], 3, channelToPin(1));
-		ws2812_sendarray_mask(&led[0], 3, channelToPin(2));
-
-		_delay_ms(10);
-
-		led[0]=0; led[1]=0; led[2]=0;
-		ws2812_sendarray_mask(&led[0], 3, channelToPin(0));
-		ws2812_sendarray_mask(&led[0], 3, channelToPin(1));
-		ws2812_sendarray_mask(&led[0], 3, channelToPin(2));
-	}
 }
 
 /* usbFunctionWrite() is called when the host sends a chunk of data to the
@@ -683,6 +633,60 @@ extern "C" void usbEventResetReady(void)
     sei();
     eeprom_write_byte(0, OSCCAL);   // store the calibrated value in EEPROM
 }
+
+void ApplyMode(void)
+{
+	if (mode == MODE_RGB || mode == MODE_RGB_INVERSE)
+	{
+		/* PWM enable,  */
+		GTCCR |= _BV(PWM1B) | _BV(COM1B1);
+		TCCR0A |= _BV(WGM00) | _BV(WGM01) | _BV(COM0A1) | _BV(COM0B1);
+
+		/* Start timer 0 and 1 */
+		TCCR1 |= _BV (CS10);
+		TCCR0B |=  _BV(CS00);
+
+		/* Set PWM value to off after a brief 10ms blink. */
+		if (mode == MODE_RGB)
+		{
+			setRGBPWM(32, 32, 32);
+			_delay_ms(10);
+			setRGBPWM(255, 255, 255);
+		}
+		else
+		{
+			setRGBPWM(223, 223, 223);
+			_delay_ms(10);
+			setRGBPWM(0, 0, 0);
+		}
+	}
+	else if (mode == MODE_WS2812)
+	{
+		//Turn off PWM
+		setRGBPWM(0, 0, 0);
+
+		/* Stop timer 0 and 1 */
+		TCCR1 &= ~_BV (CS10);
+		TCCR0B &=  ~_BV(CS00);
+
+		/* Disable PWM */
+		GTCCR &= ~_BV(PWM1B) & ~_BV(COM1B1);
+		TCCR0A &= ~_BV(WGM00) & ~_BV(WGM01) & ~_BV(COM0A1) & ~_BV(COM0B1);
+
+		led[0]=32; led[1]=32; led[2]=32;
+		ws2812_sendarray_mask(&led[0], 3, channelToPin(0));
+		ws2812_sendarray_mask(&led[0], 3, channelToPin(1));
+		ws2812_sendarray_mask(&led[0], 3, channelToPin(2));
+
+		_delay_ms(10);
+
+		led[0]=0; led[1]=0; led[2]=0;
+		ws2812_sendarray_mask(&led[0], 3, channelToPin(0));
+		ws2812_sendarray_mask(&led[0], 3, channelToPin(1));
+		ws2812_sendarray_mask(&led[0], 3, channelToPin(2));
+	}
+}
+
 
 void ledPoll() {
 
