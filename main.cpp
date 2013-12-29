@@ -129,6 +129,8 @@ const PROGMEM char usbHidReportDescriptor[USB_CFG_HID_REPORT_DESCRIPTOR_LENGTH] 
     0xc0                           // END_COLLECTION
 };
 
+const PROGMEM uint16_t ledDataCount[] = {MIN_LED_FRAME, MIN_LED_FRAME * 2, MIN_LED_FRAME * 4, MIN_LED_FRAME * 8 };
+
 static uchar currentAddress;
 static uchar addressOffset;
 static uchar bytesRemaining;
@@ -393,7 +395,7 @@ uchar usbFunctionWrite(uchar *data, uchar len)
 
 				//Prepare to send the data simultaneously together with USB polling
 				task = TASK_SEND_DATA;
-				ledCount = MAX_LEDS * 3;
+				ledCount = pgm_read_word_near(&ledDataCount[reportId - 6]);
 				ledIndex = 0;
 				delayCycles = 0;
 				
@@ -441,7 +443,7 @@ uchar usbFunctionWrite(uchar *data, uchar len)
 
 			//Prepare to send the data simultaneously together with USB polling
 			task = TASK_SEND_DATA;
-			ledCount = MAX_LEDS * 3;
+			ledCount = pgm_read_word_near(&ledDataCount[reportId - 6]);
 			ledIndex = 0;
 			delayCycles = 0;
 			
