@@ -185,6 +185,62 @@ uchar usbFunctionRead(uchar *data, uchar len)
 		data[1] = mode;
 		return 2;
 	}
+    else if (reportId == 5)
+    {
+       data[0] = 5;
+       data[1] = 0;
+       data[2] = 0;
+       data[3] = led[1];
+       data[4] = led[0];
+       data[5] = led[2];
+
+       return 6;
+    }
+    else if (reportId >= 6 && reportId <= 11) // Serial data for LEDs
+    {
+       /*
+       if (mode != MODE_WS2812)
+       {
+               return 1;
+       }
+       */
+
+       if (bytesRemaining == 0)
+       {
+		   return 0; // end of transfer 
+       }
+
+       if(len > bytesRemaining)
+           len = bytesRemaining;
+
+       //Ignore the first byte of data as it's report id
+       if (currentAddress == 0)
+       {
+          data[0] = reportId;
+          data[1] = 0;
+
+          for (int i = 2; i < len; i++)
+          {
+              data[i] = led[addressOffset + currentAddress + i - 2];
+          }
+
+          currentAddress += len - 2;
+          bytesRemaining -= (len - 1);
+       }
+       else
+       {
+          for (int i = 0; i < len; i++)
+          {
+              data[i] = led[addressOffset + currentAddress + i];
+          }
+
+          currentAddress += len;
+          bytesRemaining -= len;
+       }
+
+       return len;
+    }
+
 	else
 	{
 		return 0;
@@ -531,6 +587,36 @@ extern "C" usbMsgLen_t usbFunctionSetup(uchar data[8])
 			 else if(reportId == 4){ // Report device mode
 				 return USB_NO_MSG; 
 			 }
+			 else if(reportId == 5){ // Indexed LED data^M
+				 currentAddress = 0;
+				 bytesRemaining = 5;
+
+				 addressOffset = 0;
+				 return USB_NO_MSG; 
+			 }
+			 else if (reportId >= 6 && reportId <= 9) { // Serial data for LEDs
+			 	currentAddress = 0;
+			 	addressOffset = 0;
+
+			 	switch (reportId) {
+			 	    case 6:
+			 	 	   bytesRemaining = MIN_LED_FRAME * 1 + 1;
+			 	 	   break;
+			 	    case 7:
+			 	 	   bytesRemaining = MIN_LED_FRAME * 2 + 1;
+			 	 	   break;
+			 	    case 8:
+			 	 	   bytesRemaining = MIN_LED_FRAME * 4 + 1;
+			 	 	   break;
+			 	    case 9:
+			 	 	   bytesRemaining = MIN_LED_FRAME * 8 + 1;
+			 	 	   break;
+			 	}
+
+
+			 	return USB_NO_MSG; /* use usbFunctionWrite() to receive data from host */
+			 }
+
 
 			 return 0;
 
