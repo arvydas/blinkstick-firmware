@@ -116,16 +116,6 @@ const PROGMEM char usbHidReportDescriptor[USB_CFG_HID_REPORT_DESCRIPTOR_LENGTH] 
     0x95, MIN_LED_FRAME * 8 + 1,   //   REPORT_COUNT (193)
     0x09, 0x00,                    //   USAGE (Undefined)
     0xb2, 0x02, 0x01,              //   FEATURE (Data,Var,Abs,Buf)
-/*
-    0x85, 0x0A,                    //   REPORT_ID (10)
-    0x95, MIN_LED_FRAME * 8 + 1,   //   REPORT_COUNT (193)
-    0x09, 0x00,                    //   USAGE (Undefined)
-    0xb2, 0x02, 0x01,              //   FEATURE (Data,Var,Abs,Buf)
-    0x85, 0x0B,                    //   REPORT_ID (11)
-    0x95, MIN_LED_FRAME * 8 + 1,   //   REPORT_COUNT (193)
-    0x09, 0x00,                    //   USAGE (Undefined)
-    0xb2, 0x02, 0x01,              //   FEATURE (Data,Var,Abs,Buf)
-*/
     0xc0                           // END_COLLECTION
 };
 
@@ -196,7 +186,7 @@ uchar usbFunctionRead(uchar *data, uchar len)
 
        return 6;
     }
-    else if (reportId >= 6 && reportId <= 11) // Serial data for LEDs
+    else if (reportId >= 6 && reportId <= 9) // Serial data for LEDs
     {
        if (bytesRemaining == 0)
        {
@@ -416,7 +406,7 @@ uchar usbFunctionWrite(uchar *data, uchar len)
 
 		return 1;
 	}
-	else if (reportId >= 6 && reportId <= 11) // Serial data for LEDs
+	else if (reportId >= 6 && reportId <= 9) // Serial data for LEDs
 	{
 		if (mode != MODE_WS2812)
 		{
@@ -626,7 +616,7 @@ extern "C" usbMsgLen_t usbFunctionSetup(uchar data[8])
 				addressOffset = 0;
 				return USB_NO_MSG; 
 			 }
-			 else if (reportId >= 6 && reportId <= 11) { // Serial data for LEDs
+			 else if (reportId >= 6 && reportId <= 9) { // Serial data for LEDs
 				 currentAddress = 0;
 				 addressOffset = 0;
 
@@ -642,13 +632,6 @@ extern "C" usbMsgLen_t usbFunctionSetup(uchar data[8])
 					    break;
 					case 9:
 					    bytesRemaining = MIN_LED_FRAME * 8 + 1;
-					    break;
-					case 10:
-					    bytesRemaining = MIN_LED_FRAME * 8 + 1;
-					    break;
-					case 11:
-					    bytesRemaining = MIN_LED_FRAME * 8 + 1;
-						addressOffset = 64 * 3;
 					    break;
 				 }
 
