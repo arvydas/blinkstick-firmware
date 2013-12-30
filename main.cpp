@@ -136,6 +136,36 @@ static uint16_t ledCount = 0;
 static uint16_t ledIndex = 0;
 static uint16_t delayCycles = 0;
 
+/* ------------------------------------------------------------------------- */
+/* ----------------------------- Helper Functions--------------------------- */
+/* ------------------------------------------------------------------------- */
+
+uchar channelToPin(uchar ch) {
+	if (ch == 1) //G
+	{
+		return _BV(G_BIT);
+	}
+	else if (ch == 2) //B
+	{
+		return _BV(B_BIT);
+	}
+	else 
+	{
+		return _BV(R_BIT); //R
+	}
+}
+
+void setRGBPWM(uint8_t r, uint8_t g, uint8_t b)
+{
+	R_PWM = r;   
+	G_PWM = g;   
+	B_PWM = b;   
+}
+
+/* ------------------------------------------------------------------------- */
+/* ----------------------------- USB Communication ------------------------- */
+/* ------------------------------------------------------------------------- */
+
 /* usbFunctionRead() is called when the host requests a chunk of data from
 * the device. 
 */
@@ -231,28 +261,6 @@ uchar usbFunctionRead(uchar *data, uchar len)
 		return 0;
 	}
 
-}
-
-uchar channelToPin(uchar ch) {
-	if (ch == 1) //G
-	{
-		return _BV(G_BIT);
-	}
-	else if (ch == 2) //B
-	{
-		return _BV(B_BIT);
-	}
-	else 
-	{
-		return _BV(R_BIT); //R
-	}
-}
-
-void setRGBPWM(uint8_t r, uint8_t g, uint8_t b)
-{
-	R_PWM = r;   
-	G_PWM = g;   
-	B_PWM = b;   
 }
 
 /* usbFunctionWrite() is called when the host sends a chunk of data to the
@@ -466,8 +474,6 @@ static void SetMode(void)
 	   mode = 0;
 }
 
-
-/* ------------------------------------------------------------------------- */
 
 extern "C" usbMsgLen_t usbFunctionSetup(uchar data[8])
 {
@@ -688,7 +694,7 @@ void ApplyMode(void)
 }
 
 
-void ledPoll() {
+void ledTransfer() {
 
 	if (task != TASK_NONE)
 	{
@@ -769,7 +775,7 @@ int main(void)
     for(;;){                /* main event loop */
 	  	usbPoll();
 
-		ledPoll();	
+		ledTransfer();	
     }
     return 0;
 }
