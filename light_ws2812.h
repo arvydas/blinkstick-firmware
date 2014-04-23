@@ -1,43 +1,63 @@
 /*
- * light weight WS2812 lib
+ * light weight WS2812 lib include
  *
- * Created: 07.04.2013 15:58:05 - v0.1
- *			06.05.2013          - v0.3 - clean up
- *			27.05.2013			- v0.6 - clean up, removed RC variants, added mask
- *  Author: Tim (cpldcpu@gmail.com) 
+ * Version 2.0a3  - Jan 18th 2014
+ * Author: Tim (cpldcpu@gmail.com) 
+ *
+ * Please do not change this file! All configuration is handled in "ws2812_config.h"
+ *
+ * License: GNU GPL v2 (see License.txt)
+ +
  */ 
-
-#include <avr/io.h>
 
 #ifndef LIGHT_WS2812_H_
 #define LIGHT_WS2812_H_
 
-// Call with address to led color array (order is Green-Red-Blue)
-// Numer of bytes to be transmitted is leds*3
+#include <avr/io.h>
+#include <avr/interrupt.h>
+#include "ws2812_config.h"
 
-void ws2812_sendarray(uint8_t *ledarray,uint16_t length);
-void ws2812_sendarray_mask(uint8_t *ledarray,uint16_t length, uint8_t mask);
+/*
+ *  Structure of the LED array
+ */
 
-///////////////////////////////////////////////////////////////////////
-// User defined area: Define I/O pin
-///////////////////////////////////////////////////////////////////////
+struct cRGB { uint8_t g; uint8_t r; uint8_t b; };
 
-#define ws2812_port PORTB						// Data port register
-#define ws2812_pin 3							// Number of the data out pin
+/* User Interface
+ * 
+ * Input:
+ *         ledarray:           An array of GRB data describing the LED colors
+ *         number_of_leds:     The number of LEDs to write
+ *         pinmask (optional): Bitmask describing the output bin. e.g. _BV(PB0)
+ *
+ * The functions will perform the following actions:
+ *         - Set the data-out pin as output
+ *         - Send out the LED data 
+ *         - Wait 50µs to reset the LEDs
+ */
 
-///////////////////////////////////////////////////////////////////////
-// User defined area: Define CPU clock speed
-// Uncomment one and only one #define matching your application
-///////////////////////////////////////////////////////////////////////
+void ws2812_setleds    (struct cRGB *ledarray, uint16_t number_of_leds);
+void ws2812_setleds_pin(struct cRGB *ledarray, uint16_t number_of_leds,uint8_t pinmask);
 
-// #define ws2812_4MHz
-// #define ws2812_8MHz		
-// #define ws2812_9p6MHz
-// #define ws2812_12MHz  // Warning: Untested in v0.6
- #define ws2812_16MHz
+/* 
+ * Old interface / Internal functions
+ *
+ * The functions take a byte-array and send to the data output as WS2812 bitstream.
+ * The length is the number of bytes to send - three per LED.
+ */
 
-///////////////////////////////////////////////////////////////////////
-// End user defined area
-///////////////////////////////////////////////////////////////////////
+void ws2812_sendarray     (uint8_t *array,uint16_t length);
+void ws2812_sendarray_mask(uint8_t *array,uint16_t length, uint8_t pinmask);
+
+
+/*
+ * Internal defines
+ */
+
+#define CONCAT(a, b)            a ## b
+#define CONCAT_EXP(a, b)   CONCAT(a, b)
+
+#define ws2812_PORTREG  CONCAT_EXP(PORT,ws2812_port)
+#define ws2812_DDRREG   CONCAT_EXP(DDR,ws2812_port)
 
 #endif /* LIGHT_WS2812_H_ */
