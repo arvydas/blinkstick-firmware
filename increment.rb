@@ -12,7 +12,7 @@ file.close
 serial_number = line.to_i + 1
 
 #build serial number string
-serial_string = "BS%06d-1.2" % serial_number
+serial_string = "BS%06d-1.3" % serial_number
 
 puts serial_string
 
