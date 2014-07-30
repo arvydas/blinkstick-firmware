@@ -56,7 +56,7 @@ dumpflash:
 	$(AVRDUDE) -U flash:r:blinkstick-flash.hex:i
 
 defaults: 
-	$(AVRDUDE) -U eeprom:w:eeprom.hex:i
+	$(AVRDUDE) -B 3 -U eeprom:w:eeprom.hex:i
 
 # rule for deleting dependent files (those which can be built by Make):
 clean:
