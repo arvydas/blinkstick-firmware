@@ -20,6 +20,7 @@
 #define MODE_RGB			0
 #define MODE_RGB_INVERSE   	1
 #define MODE_WS2812		   	2
+#define MODE_WS2812_12BIT	   	3
 
 #define TASK_NONE			0
 #define TASK_SEND_DATA 		1
@@ -289,7 +290,7 @@ uchar usbFunctionWrite(uchar *data, uchar len)
 			//Set PWM values
 			setRGBPWM(led[1], led[0], led[2]);
 		}
-		else if (mode == MODE_WS2812)
+		else if (mode == MODE_WS2812 || mode == MODE_WS2812_12BIT)
 		{
 			led[0] = data[2];
 			led[1] = data[1];
@@ -297,7 +298,14 @@ uchar usbFunctionWrite(uchar *data, uchar len)
 
 			//Set only the first LED on the first channel
 			cli(); //Disable interrupts
-			ws2812_sendarray_mask(&led[0], 3, channelToPin(0));
+                        if(mode == MODE_WS2812_12BIT)
+                        {
+			    ws2812_sendarraylow_mask(&led[0], 3, channelToPin(0));
+                        }
+                        else
+                        {
+			    ws2812_sendarray_mask(&led[0], 3, channelToPin(0));
+                        }
 			sei(); //Enable interrupts
 		}
 
@@ -341,7 +349,7 @@ uchar usbFunctionWrite(uchar *data, uchar len)
 	}
 	else if (reportId == 5)
 	{
-		if (mode != MODE_WS2812)
+		if (mode != MODE_WS2812 && mode != MODE_WS2812_12BIT)
 		{
 			return 1;
 		}
@@ -366,7 +374,7 @@ uchar usbFunctionWrite(uchar *data, uchar len)
 	}
 	else if (reportId >= 6 && reportId <= 9) // Serial data for LEDs
 	{
-		if (mode != MODE_WS2812)
+		if (mode != MODE_WS2812 && mode != MODE_WS2812_12BIT)
 		{
 			return 1;
 		}
@@ -471,7 +479,7 @@ static void SetMode(void)
 {
    mode = eeprom_read_byte((uchar *)0 + 1 + 12);
 
-   if (mode > 2)
+   if (mode > 3)
 	   mode = 0;
 }
 
@@ -667,7 +675,7 @@ void ApplyMode(void)
 			setRGBPWM(0, 0, 0);
 		}
 	}
-	else if (mode == MODE_WS2812)
+	else if (mode == MODE_WS2812 || mode == MODE_WS2812_12BIT)
 	{
 		//Turn off PWM
 		setRGBPWM(0, 0, 0);
@@ -716,7 +724,15 @@ void ledTransfer() {
 			}
 
 			cli(); //Disable interrupts
-			ws2812_sendarray_mask(&led[ledIndex], len, channelToPin(channel));
+                        if(mode == MODE_WS2812_12BIT)
+                        {
+				ws2812_sendarraylow_mask(&led[ledIndex], len, channelToPin(channel));
+				ws2812_sendarrayhigh_mask(&led[ledIndex], len, channelToPin(channel));
+                        }
+                        else
+                        {
+				ws2812_sendarray_mask(&led[ledIndex], len, channelToPin(channel));
+                        }
 			sei(); //Enable interrupts
 
 			ledIndex += len;
