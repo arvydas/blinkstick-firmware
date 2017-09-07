@@ -43,13 +43,13 @@ extern "C"
 /* ----------------------------- LED interface ----------------------------- */
 /* ------------------------------------------------------------------------- */
 
-#define MAX_LEDS		64
+#define MAX_LEDS		128
 #define MIN_LED_FRAME	8 * 3
 #define DELAY_CYCLES	64
 
 static uint8_t led[MAX_LEDS * 3];
 
-const PROGMEM uint16_t ledDataCount[] = {MIN_LED_FRAME, MIN_LED_FRAME * 2, MIN_LED_FRAME * 4, MIN_LED_FRAME * 8 };
+const PROGMEM uint16_t ledDataCount[] = {MIN_LED_FRAME, MIN_LED_FRAME * 2, MIN_LED_FRAME * 4, MIN_LED_FRAME * 8, MAX_LEDS * 3};
 
 /* 
 	Reports:
@@ -62,6 +62,7 @@ const PROGMEM uint16_t ledDataCount[] = {MIN_LED_FRAME, MIN_LED_FRAME * 2, MIN_L
 		7: LED Frame [Channel, [G, R, B][0..15]]
 		8: LED Frame [Channel, [G, R, B][0..31]]
 		9: LED Frame [Channel, [G, R, B][0..63]]
+		10: LED Frame [Channel, [G, R, B][0..127]]
 	
 	Memory Map:
 		00      : Oscillator calibration value
@@ -81,62 +82,64 @@ const PROGMEM uint16_t ledDataCount[] = {MIN_LED_FRAME, MIN_LED_FRAME * 2, MIN_L
 
 const PROGMEM char usbHidReportDescriptor[USB_CFG_HID_REPORT_DESCRIPTOR_LENGTH] = {    /* USB report descriptor */
 
-    0x06, 0x00, 0xff,              // USAGE_PAGE (Generic Desktop)
-    0x09, 0x01,                    // USAGE (Vendor Usage 1)
-    0xa1, 0x01,                    // COLLECTION (Application)
-    0x15, 0x00,                    //   LOGICAL_MINIMUM (0)
-    0x26, 0xff, 0x00,              //   LOGICAL_MAXIMUM (255)
-    0x75, 0x08,                    //   REPORT_SIZE (8)
-    0x85, 0x01,                    //   REPORT_ID (1)
-    0x95, 0x03,                    //   REPORT_COUNT (3)
-    0x09, 0x00,                    //   USAGE (Undefined)
-    0xb2, 0x02, 0x01,              //   FEATURE (Data,Var,Abs,Buf)
-    0x85, 0x02,                    //   REPORT_ID (2)
-    0x95, 0x20,                    //   REPORT_COUNT (32)
-    0x09, 0x00,                    //   USAGE (Undefined)
-    0xb2, 0x02, 0x01,              //   FEATURE (Data,Var,Abs,Buf)
-    0x85, 0x03,                    //   REPORT_ID (3)
-    0x95, 0x20,                    //   REPORT_COUNT (32)
-    0x09, 0x00,                    //   USAGE (Undefined)
-    0xb2, 0x02, 0x01,              //   FEATURE (Data,Var,Abs,Buf)
-    0x85, 0x04,                    //   REPORT_ID (4)
-    0x95, 0x01,                    //   REPORT_COUNT (1)
-    0x09, 0x00,                    //   USAGE (Undefined)
-    0xb2, 0x02, 0x01,              //   FEATURE (Data,Var,Abs,Buf)
-    0x85, 0x05,                    //   REPORT_ID (5)
-    0x95, 0x05,                    //   REPORT_COUNT (5)
-    0x09, 0x00,                    //   USAGE (Undefined)
-    0xb2, 0x02, 0x01,              //   FEATURE (Data,Var,Abs,Buf)
-    0x85, 0x06,                    //   REPORT_ID (6)
-    0x95, MIN_LED_FRAME + 1,       //   REPORT_COUNT (25)
-    0x09, 0x00,                    //   USAGE (Undefined)
-    0xb2, 0x02, 0x01,              //   FEATURE (Data,Var,Abs,Buf)
-    0x85, 0x07,                    //   REPORT_ID (7)
-    0x95, MIN_LED_FRAME * 2 + 1,   //   REPORT_COUNT (49)
-    0x09, 0x00,                    //   USAGE (Undefined)
-    0xb2, 0x02, 0x01,              //   FEATURE (Data,Var,Abs,Buf)
-    0x85, 0x08,                    //   REPORT_ID (8)
-    0x95, MIN_LED_FRAME * 4 + 1,   //   REPORT_COUNT (97)
-    0x09, 0x00,                    //   USAGE (Undefined)
-    0xb2, 0x02, 0x01,              //   FEATURE (Data,Var,Abs,Buf)
-    0x85, 0x09,                    //   REPORT_ID (9)
-    0x95, MIN_LED_FRAME * 8 + 1,   //   REPORT_COUNT (193)
-    0x09, 0x00,                    //   USAGE (Undefined)
-    0xb2, 0x02, 0x01,              //   FEATURE (Data,Var,Abs,Buf)
-    0xc0                           // END_COLLECTION
+    '\x06', '\x00', '\xff',          // USAGE_PAGE (Generic Desktop)
+    '\x09', '\x01',                  // USAGE (Vendor Usage 1)
+    '\xa1', '\x01',                  // COLLECTION (Application)
+    '\x15', '\x00',                  //   LOGICAL_MINIMUM (0)
+    '\x26', '\xff', '\x00',          //   LOGICAL_MAXIMUM (255)
+    '\x75', '\x08',                  //   REPORT_SIZE (8)
+    '\x85', '\x01',                  //   REPORT_ID (1)
+    '\x95', '\x03',                  //   REPORT_COUNT (3)
+    '\x09', '\x00',                  //   USAGE (Undefined)
+    '\xb2', '\x02', '\x01',          //   FEATURE (Data,Var,Abs,Buf)
+    '\x85', '\x02',                  //   REPORT_ID (2)
+    '\x95', '\x20',                  //   REPORT_COUNT (32)
+    '\x09', '\x00',                  //   USAGE (Undefined)
+    '\xb2', '\x02', '\x01',          //   FEATURE (Data,Var,Abs,Buf)
+    '\x85', '\x03',                  //   REPORT_ID (3)
+    '\x95', '\x20',                  //   REPORT_COUNT (32)
+    '\x09', '\x00',                  //   USAGE (Undefined)
+    '\xb2', '\x02', '\x01',          //   FEATURE (Data,Var,Abs,Buf)
+    '\x85', '\x04',                  //   REPORT_ID (4)
+    '\x95', '\x01',                  //   REPORT_COUNT (1)
+    '\x09', '\x00',                  //   USAGE (Undefined)
+    '\xb2', '\x02', '\x01',          //   FEATURE (Data,Var,Abs,Buf)
+    '\x85', '\x05',                  //   REPORT_ID (5)
+    '\x95', '\x05',                  //   REPORT_COUNT (5)
+    '\x09', '\x00',                  //   USAGE (Undefined)
+    '\xb2', '\x02', '\x01',          //   FEATURE (Data,Var,Abs,Buf)
+    '\x85', '\x06',                  //   REPORT_ID (6)
+    '\x95', '\x19',                  //   REPORT_COUNT (25)
+    '\x09', '\x00',                  //   USAGE (Undefined)
+    '\xb2', '\x02', '\x01',          //   FEATURE (Data,Var,Abs,Buf)
+    '\x85', '\x07',                  //   REPORT_ID (7)
+    '\x95', '\x31',                  //   REPORT_COUNT (49)
+    '\x09', '\x00',                  //   USAGE (Undefined)
+    '\xb2', '\x02', '\x01',          //   FEATURE (Data,Var,Abs,Buf)
+    '\x85', '\x08',                  //   REPORT_ID (8)
+    '\x95', '\x61',                  //   REPORT_COUNT (97)
+    '\x09', '\x00',                  //   USAGE (Undefined)
+    '\xb2', '\x02', '\x01',          //   FEATURE (Data,Var,Abs,Buf)
+    '\x85', '\x09',                  //   REPORT_ID (9)
+    '\x95', '\xc1',                  //   REPORT_COUNT (193)
+    '\x09', '\x00',                  //   USAGE (Undefined)
+    '\xb2', '\x02', '\x01',          //   FEATURE (Data,Var,Abs,Buf)
+    '\x85', '\x0a',                  //   REPORT_ID (10)
+    '\x96', '\x81', '\x01',          //   REPORT_COUNT (385)
+    '\x09', '\x00',                  //   USAGE (Undefined)
+    '\xb2', '\x02', '\x01',          //   FEATURE (Data,Var,Abs,Buf)
+    '\xc0'                           // END_COLLECTION
 };
 
-static uchar currentAddress;
-static uchar addressOffset;
-static uchar bytesRemaining;
+static uint16_t currentAddress;
+static uint16_t bytesRemaining;
 static uchar reportId = 0; 
 static uchar channel;
 
 static uint8_t mode;
 static uint8_t task = 0;
 static uint16_t ledCount = 0;
-static uint16_t ledIndex = 0;
-static uint16_t delayCycles = 0;
+static uint8_t delayCycles = 0;
 
 /* ------------------------------------------------------------------------- */
 /* ----------------------------- Helper Functions--------------------------- */
@@ -186,11 +189,12 @@ uchar usbFunctionRead(uchar *data, uchar len)
 		if(len > bytesRemaining)
 			len = bytesRemaining;
 
+                uint8_t addressOffset = reportId==2 ? 32 : 64;
 		//Ignore the first byte of data as it's report id
 		if (currentAddress == 0)
 		{
 			data[0] = reportId;
-			eeprom_read_block(&data[1], (uchar *)0 + currentAddress + addressOffset, len - 1);
+			eeprom_read_block(&data[1], (uchar *)0 + addressOffset, len - 1);
 			currentAddress += len - 1;
 			bytesRemaining -= (len - 1);
 		}
@@ -220,7 +224,7 @@ uchar usbFunctionRead(uchar *data, uchar len)
 
        return 6;
     }
-    else if (reportId >= 6 && reportId <= 9) // Serial data for LEDs
+    else if (reportId >= 6 && reportId <= 10) // Serial data for LEDs
     {
        if (bytesRemaining == 0)
        {
@@ -238,7 +242,7 @@ uchar usbFunctionRead(uchar *data, uchar len)
 
           for (int i = 2; i < len; i++)
           {
-              data[i] = led[addressOffset + currentAddress + i - 2];
+              data[i] = led[currentAddress + i - 2];
           }
 
           currentAddress += len - 2;
@@ -248,7 +252,7 @@ uchar usbFunctionRead(uchar *data, uchar len)
        {
           for (int i = 0; i < len; i++)
           {
-              data[i] = led[addressOffset + currentAddress + i];
+              data[i] = led[currentAddress + i];
           }
 
           currentAddress += len;
@@ -319,10 +323,11 @@ uchar usbFunctionWrite(uchar *data, uchar len)
 		if(len > bytesRemaining)
 			len = bytesRemaining;
 
+                uint8_t addressOffset = reportId==2 ? 32 : 64;
 		//Ignore the first byte of data as it's report id
 		if (currentAddress == 0)
 		{
-			eeprom_write_block(&data[1], (uchar *)0 + currentAddress + addressOffset, len);
+			eeprom_write_block(&data[1], (uchar *)0 + addressOffset, len);
 			currentAddress += len - 1;
 			bytesRemaining -= (len - 1);
 		}
@@ -364,7 +369,6 @@ uchar usbFunctionWrite(uchar *data, uchar len)
 		//Prepare to send the data simultaneously together with USB polling
 		task = TASK_SEND_DATA;
 		ledCount = (index + 1) * 3;
-		ledIndex = 0;
 		delayCycles = 0;
 		
 		//Disable any USB requests while sending data to LED Strip
@@ -372,7 +376,7 @@ uchar usbFunctionWrite(uchar *data, uchar len)
 
 		return 1;
 	}
-	else if (reportId >= 6 && reportId <= 9) // Serial data for LEDs
+	else if (reportId >= 6 && reportId <= 10) // Serial data for LEDs
 	{
 		if (mode != MODE_WS2812 && mode != MODE_WS2812_12BIT)
 		{
@@ -381,17 +385,13 @@ uchar usbFunctionWrite(uchar *data, uchar len)
 
 		if (bytesRemaining == 0)
 		{
-			if (reportId != 10)
-			{
-				//Prepare to send the data simultaneously together with USB polling
-				task = TASK_SEND_DATA;
-				ledCount = pgm_read_word_near(&ledDataCount[reportId - 6]);
-				ledIndex = 0;
-				delayCycles = 0;
-				
-				//Disable any USB requests while sending data to LED Strip
-				usbDisableAllRequests();
-			}
+			//Prepare to send the data simultaneously together with USB polling
+			task = TASK_SEND_DATA;
+			ledCount = pgm_read_word_near(&ledDataCount[reportId - 6]);
+			delayCycles = 0;
+			
+			//Disable any USB requests while sending data to LED Strip
+			usbDisableAllRequests();
 
 			return 1; // end of transfer 
 		}
@@ -406,7 +406,7 @@ uchar usbFunctionWrite(uchar *data, uchar len)
 
 			for (int i = 2; i < len; i++)
 			{
-				led[addressOffset + currentAddress + i - 2] = data[i];
+				led[currentAddress + i - 2] = data[i];
 			}
 
 			currentAddress += len - 2;
@@ -416,19 +416,18 @@ uchar usbFunctionWrite(uchar *data, uchar len)
 		{
 			for (int i = 0; i < len; i++)
 			{
-				led[addressOffset + currentAddress + i] = data[i];
+				led[currentAddress + i] = data[i];
 			}
 
 			currentAddress += len;
 			bytesRemaining -= len;
 		}
 
-		if (bytesRemaining <= 0 && reportId != 10)
+		if (bytesRemaining <= 0)
 		{
 			//Prepare to send the data simultaneously together with USB polling
 			task = TASK_SEND_DATA;
 			ledCount = pgm_read_word_near(&ledDataCount[reportId - 6]);
-			ledIndex = 0;
 			delayCycles = 0;
 			
 			//Disable any USB requests while sending data to LED Strip
@@ -497,17 +496,11 @@ extern "C" usbMsgLen_t usbFunctionSetup(uchar data[8])
 			 else if(reportId == 2){ // Name of the device
 				 bytesRemaining = 33;
 				 currentAddress = 0;
-
-				 addressOffset = 32;
-
 				 return USB_NO_MSG; 
 			 }
 			 else if(reportId == 3){ // Data of the device
 				 bytesRemaining = 33;
 				 currentAddress = 0;
-
-				 addressOffset = 64;
-
 				 return USB_NO_MSG; 
 			 }
 			 else if(reportId == 4){ // Report device mode
@@ -516,13 +509,10 @@ extern "C" usbMsgLen_t usbFunctionSetup(uchar data[8])
 			 else if(reportId == 5){ // Indexed LED data^M
 				 currentAddress = 0;
 				 bytesRemaining = 5;
-
-				 addressOffset = 0;
 				 return USB_NO_MSG; 
 			 }
-			 else if (reportId >= 6 && reportId <= 9) { // Serial data for LEDs
+			 else if (reportId >= 6 && reportId <= 10) { // Serial data for LEDs
 			 	currentAddress = 0;
-			 	addressOffset = 0;
 
 			 	switch (reportId) {
 			 	    case 6:
@@ -536,6 +526,9 @@ extern "C" usbMsgLen_t usbFunctionSetup(uchar data[8])
 			 	 	   break;
 			 	    case 9:
 			 	 	   bytesRemaining = MIN_LED_FRAME * 8 + 1;
+			 	 	   break;
+			 	    case 10:
+			 	 	   bytesRemaining = MAX_LEDS*3 + 1;
 			 	 	   break;
 			 	}
 
@@ -555,34 +548,25 @@ extern "C" usbMsgLen_t usbFunctionSetup(uchar data[8])
 			 else if(reportId == 2){ // Name of the device
 				currentAddress = 0;
 				bytesRemaining = 32;
-
-				addressOffset = 32;
 				return USB_NO_MSG; 
 			 }
 			 else if(reportId == 3){ // Name of the device
 				currentAddress = 0;
 				bytesRemaining = 32;
-
-				addressOffset = 64;
 				return USB_NO_MSG; 
 			 }
 			 else if(reportId == 4){ // Mode
 				currentAddress = 0;
 				bytesRemaining = 1;
-
-				addressOffset = 0;
 				return USB_NO_MSG; 
 			 }
 			 else if(reportId == 5){ // Indexed LED data
 				currentAddress = 0;
 				bytesRemaining = 5;
-
-				addressOffset = 0;
 				return USB_NO_MSG; 
 			 }
-			 else if (reportId >= 6 && reportId <= 9) { // Serial data for LEDs
+			 else if (reportId >= 6 && reportId <= 10) { // Serial data for LEDs
 				 currentAddress = 0;
-				 addressOffset = 0;
 
 				 switch (reportId) {
 					case 6:
@@ -596,6 +580,9 @@ extern "C" usbMsgLen_t usbFunctionSetup(uchar data[8])
 					    break;
 					case 9:
 					    bytesRemaining = MIN_LED_FRAME * 8 + 1;
+					    break;
+					case 10:
+					    bytesRemaining = MAX_LEDS*3 + 1;
 					    break;
 				 }
 
@@ -716,32 +703,27 @@ void ledTransfer() {
 		if (task == TASK_SEND_DATA)
 		{
 			//send all data at the same time, asume there is going to be no communication over USB during this time
-			uint16_t len = 3 * 64;
+			uint16_t len = 3 * MAX_LEDS;
 
-			if (ledIndex + len >= ledCount)
+			if (len > ledCount)
 			{
-				len = ledCount - ledIndex;
+				len = ledCount;
 			}
 
 			cli(); //Disable interrupts
                         if(mode == MODE_WS2812_12BIT)
                         {
-				ws2812_sendarraylow_mask(&led[ledIndex], len, channelToPin(channel));
-				ws2812_sendarrayhigh_mask(&led[ledIndex], len, channelToPin(channel));
+				ws2812_sendarraylow_mask(led, len, channelToPin(channel));
+				ws2812_sendarrayhigh_mask(led, len, channelToPin(channel));
                         }
                         else
                         {
-				ws2812_sendarray_mask(&led[ledIndex], len, channelToPin(channel));
+				ws2812_sendarray_mask(led, len, channelToPin(channel));
                         }
 			sei(); //Enable interrupts
 
-			ledIndex += len;
-
-			if (ledIndex >= ledCount - 1)
-			{
-				task = TASK_NONE;
-				usbEnableAllRequests();
-			}
+			task = TASK_NONE;
+			usbEnableAllRequests();
 		}
 		else if (task == TASK_SET_MODE)
 		{
@@ -759,8 +741,6 @@ void ledTransfer() {
 
 int main(void)
 {
-	uchar   i;
-
 	wdt_enable(WDTO_1S);
 
 	SetSerial();
@@ -776,9 +756,8 @@ int main(void)
 
     usbInit();
     usbDeviceDisconnect();  /* enforce re-enumeration, do this while interrupts are disabled! */
-    i = 0;
-    while(--i){             /* fake USB disconnect for > 250 ms */
-		wdt_reset();
+    for(uint8_t i=255; i!=0; i--){  /* fake USB disconnect for > 250 ms */
+	wdt_reset();
         _delay_ms(1);
     }
     usbDeviceConnect();
