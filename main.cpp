@@ -120,7 +120,7 @@ const PROGMEM char usbHidReportDescriptor[USB_CFG_HID_REPORT_DESCRIPTOR_LENGTH] 
     '\x09', '\x00',                  //   USAGE (Undefined)
     '\xb2', '\x02', '\x01',          //   FEATURE (Data,Var,Abs,Buf)
     '\x85', '\x09',                  //   REPORT_ID (9)
-    '\x96', '\xc1',                  //   REPORT_COUNT (193)
+    '\x95', '\xc1',                  //   REPORT_COUNT (193)
     '\x09', '\x00',                  //   USAGE (Undefined)
     '\xb2', '\x02', '\x01',          //   FEATURE (Data,Var,Abs,Buf)
     '\x85', '\x0a',                  //   REPORT_ID (10)
@@ -557,7 +557,7 @@ extern "C" usbMsgLen_t usbFunctionSetup(uchar data[8])
 				bytesRemaining = 5;
 				return USB_NO_MSG; 
 			 }
-			 else if (reportId >= 6 && reportId <= 9) { // Serial data for LEDs
+			 else if (reportId >= 6 && reportId <= 10) { // Serial data for LEDs
 				 currentAddress = 0;
 
 				 switch (reportId) {
