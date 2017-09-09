@@ -48,6 +48,8 @@ void ws2812_setleds_pin(struct cRGB *ledarray, uint16_t number_of_leds,uint8_t p
 
 void ws2812_sendarray     (uint8_t *array,uint16_t length);
 void ws2812_sendarray_mask(uint8_t *array,uint16_t length, uint8_t pinmask);
+void ws2812_sendarraylow_mask(uint8_t *array,uint16_t length, uint8_t pinmask);
+void ws2812_sendarrayhigh_mask(uint8_t *array,uint16_t length, uint8_t pinmask);
 
 
 /*

@@ -92,19 +92,9 @@ void ws2812_sendarray(uint8_t *data,uint16_t datlen)
 #define w_nop8  w_nop4 w_nop4
 #define w_nop16 w_nop8 w_nop8
 
-void inline ws2812_sendarray_mask(uint8_t *data,uint16_t datlen,uint8_t maskhi)
-{
-  uint8_t curbyte,ctr,masklo;
-  uint8_t sreg_prev;
-  
-  masklo	=~maskhi&ws2812_PORTREG;
-  maskhi |=        ws2812_PORTREG;
-  sreg_prev=SREG;
-  cli();  
+inline void send_byte(uint8_t curbyte, uint8_t maskhi, uint8_t masklo){
+    uint8_t ctr;
 
-  while (datlen--) {
-    curbyte=*data++;
-    
     asm volatile(
     "       ldi   %0,8  \n\t"
     "loop%=:            \n\t"
@@ -164,6 +154,57 @@ w_nop16
     :	"=&d" (ctr)
     :	"r" (curbyte), "I" (_SFR_IO_ADDR(ws2812_PORTREG)), "r" (maskhi), "r" (masklo)
     );
+}
+
+void inline ws2812_sendarray_mask(uint8_t *data,uint16_t datlen,uint8_t maskhi)
+{
+  uint8_t curbyte, masklo;
+  uint8_t sreg_prev;
+  
+  masklo	=~maskhi&ws2812_PORTREG;
+  maskhi |=        ws2812_PORTREG;
+  sreg_prev=SREG;
+  cli();  
+
+  while (datlen--) {
+    curbyte=*data++;
+    send_byte(curbyte, maskhi, masklo);
+  }
+  
+  SREG=sreg_prev;
+}
+
+void inline ws2812_sendarraylow_mask(uint8_t *data,uint16_t datlen,uint8_t maskhi)
+{
+  uint8_t curbyte, masklo;
+  uint8_t sreg_prev;
+  
+  masklo	=~maskhi&ws2812_PORTREG;
+  maskhi |=        ws2812_PORTREG;
+  sreg_prev=SREG;
+  cli();  
+
+  while (datlen--) {
+    curbyte=*data++;
+    send_byte(curbyte<<4, maskhi, masklo);
+  }
+  
+  SREG=sreg_prev;
+}
+
+void inline ws2812_sendarrayhigh_mask(uint8_t *data,uint16_t datlen,uint8_t maskhi)
+{
+  uint8_t curbyte, masklo;
+  uint8_t sreg_prev;
+  
+  masklo	=~maskhi&ws2812_PORTREG;
+  maskhi |=        ws2812_PORTREG;
+  sreg_prev=SREG;
+  cli();  
+
+  while (datlen--) {
+    curbyte=*data++;
+    send_byte(curbyte&240, maskhi, masklo);
   }
   
   SREG=sreg_prev;
