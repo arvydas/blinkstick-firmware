@@ -63,6 +63,7 @@ const PROGMEM uint16_t ledDataCount[] = {MIN_LED_FRAME, MIN_LED_FRAME * 2, MIN_L
 		8: LED Frame [Channel, [G, R, B][0..31]]
 		9: LED Frame [Channel, [G, R, B][0..63]]
 		10: LED Frame [Channel, [G, R, B][0..127]]
+		20: Frame repeat [repetitions]
 	
 	Memory Map:
 		00      : Oscillator calibration value
@@ -128,6 +129,10 @@ const PROGMEM char usbHidReportDescriptor[USB_CFG_HID_REPORT_DESCRIPTOR_LENGTH] 
     '\x96', '\x81', '\x01',          //   REPORT_COUNT (385)
     '\x09', '\x00',                  //   USAGE (Undefined)
     '\xb2', '\x02', '\x01',          //   FEATURE (Data,Var,Abs,Buf)
+    '\x85', '\x14',                  //   REPORT_ID (20)
+    '\x95', '\x01',                  //   REPORT_COUNT (1)
+    '\x09', '\x00',                  //   USAGE (Undefined)
+    '\xb2', '\x02', '\x01',          //   FEATURE (Data,Var,Abs,Buf)
     '\xc0'                           // END_COLLECTION
 };
 
@@ -137,6 +142,7 @@ static uchar reportId = 0;
 static uchar channel;
 
 static uint8_t mode;
+static uint8_t repeat = 1;
 static uint8_t task = 0;
 static uint16_t ledCount = 0;
 static uint8_t delayCycles = 0;
@@ -261,7 +267,12 @@ uchar usbFunctionRead(uchar *data, uchar len)
 
        return len;
     }
-
+    else if (reportId == 20)
+    {
+        data[0] = 20;
+        data[1] = repeat;
+        return 2;
+    }
 	else
 	{
 		return 0;
@@ -436,6 +447,11 @@ uchar usbFunctionWrite(uchar *data, uchar len)
 
 		return bytesRemaining == 0; // return 1 if this was the last chunk 
 	}
+	else if (reportId == 20)
+	{
+		repeat = data[1];
+		return 1;
+	}
 	else
 	{
 		return 1;
@@ -535,6 +551,9 @@ extern "C" usbMsgLen_t usbFunctionSetup(uchar data[8])
 
 			 	return USB_NO_MSG; /* use usbFunctionWrite() to receive data from host */
 			 }
+			 else if(reportId == 20){ // Set repeat
+				 return USB_NO_MSG; 
+			 }
 
 
 			 return 0;
@@ -588,6 +607,11 @@ extern "C" usbMsgLen_t usbFunctionSetup(uchar data[8])
 
 
 				 return USB_NO_MSG; /* use usbFunctionWrite() to receive data from host */
+			 }
+			 else if(reportId == 20){
+				currentAddress = 0;
+				bytesRemaining = 1;
+				return USB_NO_MSG; 
 			 }
 			 return 0;
         }
@@ -713,12 +737,16 @@ void ledTransfer() {
 			cli(); //Disable interrupts
                         if(mode == MODE_WS2812_12BIT)
                         {
-				ws2812_sendarraylow_mask(led, len, channelToPin(channel));
-				ws2812_sendarrayhigh_mask(led, len, channelToPin(channel));
+				for(uint8_t i=0; i<repeat; i++){
+				    ws2812_sendarraylow_mask(led, len, channelToPin(channel));
+				    ws2812_sendarrayhigh_mask(led, len, channelToPin(channel));
+				}
                         }
                         else
                         {
-				ws2812_sendarray_mask(led, len, channelToPin(channel));
+				for(uint8_t i=0; i<repeat; i++){
+				    ws2812_sendarray_mask(led, len, channelToPin(channel));
+				}
                         }
 			sei(); //Enable interrupts
 
